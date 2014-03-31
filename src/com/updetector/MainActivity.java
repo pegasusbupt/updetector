@@ -30,6 +30,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.Vector;
 
 import org.apache.commons.math3.analysis.function.Constant;
 
@@ -90,6 +91,8 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.skyhookwireless.wps.WPSAuthentication;
 import com.skyhookwireless.wps.WPSContinuation;
 import com.skyhookwireless.wps.WPSLocation;
@@ -102,6 +105,8 @@ import com.updetector.classification.ClassificationManager;
 import com.updetector.classification.WekaClassifier;
 import com.updetector.fusion.ConditionalProbability;
 import com.updetector.fusion.FusionManager;
+import com.updetector.google.activityrecognition.GoogleActivityRecognitionClientRemover;
+import com.updetector.google.activityrecognition.GoogleActivityRecognitionClientRequester;
 import com.updetector.indicator.accelerometerbased.AccelerometerFeature;
 import com.updetector.indicator.iodetector.CellTowerChart;
 import com.updetector.indicator.iodetector.DetectionProfile;
@@ -111,10 +116,11 @@ import com.updetector.managers.AudioRecordManager;
 import com.updetector.managers.EventDetectionNotificationManager;
 import com.updetector.managers.LogManager;
 import com.updetector.managers.WakeLockManager;
-import com.updetector.sensorlist.BluetoothConnectionService;
 import com.updetector.sensorlist.Sensors;
 import com.updetector.viewadapters.MarkerInfoWindowAdapter;
-
+import com.updetector.blocksmap.ParkingBlock;
+import com.updetector.blocksmap.ParkingBlocks;
+import com.updetector.bluetooth.BluetoothConnectionService;
 
 /**
  * Sample application that demonstrates the use of
@@ -138,13 +144,15 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	 */
 
     // Holds the text view  
-    private TextView consoleTextView, environTextView, stateTextView, detectionTextView;
+    private TextView consoleTextView, environTextView, stateTextView, googleStateTextView;
     public static final String ENVIRONMENT_PREFIX="Environment : ";
     public static final String STATE_PREFIX="State : ";
-    public static final String DETECTION_PREFIX="Detection : ";
+    public static final String GOOGLE_MOBILITY_STATE_PREFIX="Goolge State : ";
     public static final String INDICATOR_PREFIX="Indicator : "; 
     private GoogleMap mMap;
 
+    
+    Vector<ParkingBlock> parkingBlocks = null;
     
 	/**
      * Holds activity recognition data, in the form of
@@ -179,10 +187,9 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
     private WakeLockManager mWakeLockManager;
     
     // The activity recognition update request object
-    private DetectionRequester mDetectionRequester;
-
+    private GoogleActivityRecognitionClientRequester mGoogleActivityDetectionRequester;
     // The activity recognition update removal object
-    private DetectionRemover mDetectionRemover;
+    private GoogleActivityRecognitionClientRemover mGoogleActivityDetectionRemover;
     
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
@@ -207,6 +214,16 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	    private ArrayList<Integer> pastEnvironments=new ArrayList<Integer>();
 	
 	
+	/**
+	 * Communications with services    
+	 */
+	public static final String BLUETOOTH_CONNECTION_UPDATE = "BLUETOOTH_CONNECTION_ACK";
+	public static final String BLUETOOTH_CON_UPDATE_EVENT_CODE = "EVENT_CODE";
+	
+	public static final String GOOGLE_ACTIVITY_RECOGNITION_UPDATE="GOOGLE_ACTIVITY_RECOGNITION_UPDATE";
+	public static final String GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_TYPE="MOST_LIKELY_ACTIVITY_TYPE";
+	public static final String GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_CONFIDENCE="MOST_LIKELY_ACTIVITY_CONFIDENCE";
+		
 	    
 	    
 	/**
@@ -223,9 +240,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
     private REQUEST_TYPE mRequestType;
     
        
-    public final static String BLUETOOTH_CONNECTION_ACK = "BLUETOOTH_CONNECTION_ACK";
-	public final static String EXTRA_MESSAGE = "EVENT_CODE";
-	
+   
 	
 	public class LocationClientListener implements LocationListener{
 		int eventCode;
@@ -338,8 +353,8 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	    public void onReceive(Context context, Intent intent) {
 	    	String action=intent.getAction();
 	    	Log.e(LOG_TAG, action);
-	    	if(action.equals(BLUETOOTH_CONNECTION_ACK)) {
-	        	int eventCode = intent.getIntExtra(EXTRA_MESSAGE, Constants.OUTCOME_NONE);
+	    	if(action.equals(BLUETOOTH_CONNECTION_UPDATE)) {
+	        	int eventCode = intent.getIntExtra(BLUETOOTH_CON_UPDATE_EVENT_CODE, Constants.OUTCOME_NONE);
 	        	System.out.println(eventCode);
 				
 				Toast.makeText(getApplicationContext(), "\ndetected "+CommonUtils.eventCodeToString(eventCode)+" at time: "+CommonUtils.formatTimestamp( new Date(), "HH:mm:ss" ), Toast.LENGTH_LONG).show();
@@ -652,7 +667,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 			environTextView.setText(ENVIRONMENT_PREFIX+CommonUtils.eventCodeToString(lastEnvironment));
 			stateTextView=(TextView) findViewById(R.id.state);
 			stateTextView.setText(STATE_PREFIX+"unknown");
-			detectionTextView=(TextView) findViewById(R.id.detection);
+			googleStateTextView=(TextView) findViewById(R.id.google_state);
 //			detectionTextView.setText(DETECTION_PREFIX+"none");
 			
 			//indicatorTextView=(TextView) findViewById(R.id.indicator);
@@ -663,6 +678,10 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 			//set up the location client
 			setupLocationClientIfNeeded();
 			
+			if (parkingBlocks == null) {
+				parkingBlocks = ParkingBlocks.GetParkingBlocks();
+				showAvailabilityMap();
+			}
 			
 		
 
@@ -683,12 +702,12 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	        mBroadcastFilter = new IntentFilter(Constants.ACTION_REFRESH_STATUS_LIST);
 	        mBroadcastFilter.addCategory(Constants.CATEGORY_LOCATION_SERVICES);
 	        
-	        mBroadcastFilter.addAction(BLUETOOTH_CONNECTION_ACK);
+	        mBroadcastFilter.addAction(BLUETOOTH_CONNECTION_UPDATE);
 	        mBroadcastManager.registerReceiver(bluetoothReceiver, mBroadcastFilter);
 	
 	        // Get detection requester and remover objects
-	        mDetectionRequester = new DetectionRequester(this);
-	        mDetectionRemover = new DetectionRemover(this);
+	        mGoogleActivityDetectionRequester = new GoogleActivityRecognitionClientRequester(this);
+	        mGoogleActivityDetectionRemover = new GoogleActivityRecognitionClientRemover(this);
 	
 	        // Get the instance of the customized notification manager
 	        mEventDetectionNotificationManager=EventDetectionNotificationManager.getInstance(this);
@@ -791,6 +810,35 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
         //String features=AudioFeatureExtraction.extractFeatures(this, "/sdcard/bus6.wav");
 	    //mClassificationManager.mClassfiers.get(Constants.SENSOR_MICROPHONE).classify(features);
 	    
+    }
+    
+    
+    public void showAvailabilityMap() {
+    	//MapFragment mapFragment = (MapFragment)getFragmentManager().findFragmentById(R.id.map);
+        //GoogleMap map = mapFragment.getMap();
+    	//GoogleMap map = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map))
+        //.getMap();
+//        VisibleRegion bounds = map.getProjection().getVisibleRegion();
+//        LatLngBounds xyBounds = bounds.latLngBounds;
+//        String msg = "northest = " + xyBounds.northeast;
+//        CameraUpdate center=
+//            CameraUpdateFactory.newLatLng(new LatLng(41.909348,
+//                		-87.777664));
+//            CameraUpdate zoom=CameraUpdateFactory.zoomTo(15);
+//
+//            mMap.moveCamera(center);
+//            mMap.animateCamera(zoom);        
+
+            
+            for (int i = 0; i < parkingBlocks.size(); i++) {
+            	ParkingBlock parkingBlock = parkingBlocks.elementAt(i);
+            	PolylineOptions line = new PolylineOptions().add(parkingBlock.startLocation, parkingBlock.endLocation)
+            			.width(20).color(parkingBlock.getColorByAvailability());
+            	Polyline polyline = mMap.addPolyline(line);
+            	parkingBlock.display = polyline;
+            	//map.addMarker(new MarkerOptions().position(parkingBlock.meterLocation)
+            		//.title(parkingBlock.meterAddress));
+            }
     }
     
   /**
@@ -1298,14 +1346,14 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 				if (Constants.REQUEST_TYPE.ADD == mRequestType) {
 					// Restart the process of requesting activity recognition
 					// updates
-					mDetectionRequester.requestUpdates();
+					mGoogleActivityDetectionRequester.requestUpdates();
 					// If the request was to remove activity recognition updates
 				} else if (Constants.REQUEST_TYPE.REMOVE == mRequestType) {
 					/*
 					 * Restart the removal of all activity recognition updates
 					 * for the PendingIntent.
 					 */
-					mDetectionRemover.removeUpdates(mDetectionRequester
+					mGoogleActivityDetectionRemover.removeUpdates(mGoogleActivityDetectionRequester
 							.getRequestPendingIntent());
 
 				}
@@ -1465,6 +1513,65 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 		mMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));		
 		//add a marker on the map				
 		Log.e(LOG_TAG, "operations on map completed");
+		
+		
+		//5. update availability display
+		//updateAvailabilityDisplay(eventCode, location);
+		//add a marker on the map				
+		Log.e(LOG_TAG, "operations on map completed");
+		updateAvailabilityDisplay(eventCode, location);
+	}
+	
+	
+	public void updateAvailabilityDisplay(int eventCode, Location location) {
+		//mMap.clear();
+		
+//        for (int i = 0; i < parkingBlocks.size(); i++) {
+//        	ParkingBlock parkingBlock = parkingBlocks.elementAt(i);
+//        	PolylineOptions line =  
+//        			new PolylineOptions().add(parkingBlock.startLocation, parkingBlock.endLocation)
+//        			.width(20).color(Color.RED);
+//        	Polyline polyline = mMap.addPolyline(line);
+//        	parkingBlock.display = polyline;
+//        }
+
+
+//        for (int i = 0; i < parkingBlocks.size(); i++) {
+//        	ParkingBlock parkingBlock = parkingBlocks.elementAt(i);
+//        	parkingBlock.display.setColor(Color.RED);;
+//        }
+		
+		
+		
+		// find closest street block within 30 meters
+        LatLng point = new LatLng(location.getLatitude(),location.getLongitude());
+        double minDist = Double.MAX_VALUE;
+        ParkingBlock matchedBlock = null;
+        for (int i = 0; i < parkingBlocks.size(); i++) {
+        	ParkingBlock parkingBlock = parkingBlocks.elementAt(i);
+        	double dist = parkingBlock.distanceToPoint(point);
+        	if (dist < minDist) {
+        		minDist = dist;
+        		matchedBlock = parkingBlock;
+        	}
+        }
+        if (matchedBlock != null) {
+//Toast.makeText(getApplicationContext(), "a block matched", 2).show();        	
+            if(eventCode==Constants.OUTCOME_PARKING) {
+            	matchedBlock.availability = 0;
+            } else {
+            	matchedBlock.availability = 1;
+            }
+        }
+        showAvailabilityMap();
+//        for (int i = 0; i < parkingBlocks.size(); i++) {
+//      	    ParkingBlock parkingBlock = parkingBlocks.elementAt(i);
+//    	    PolylineOptions line =  
+//    			new PolylineOptions().add(parkingBlock.startLocation, parkingBlock.endLocation)
+//    			.width(20).color(parkingBlock.getColorByAvailability());
+//    	    Polyline polyline = mMap.addPolyline(line);
+//    	    parkingBlock.display = polyline;
+//        }        
 	}
 
 	@Override
@@ -1564,7 +1671,7 @@ private double calVelocityIncrease()
         mRequestType = Constants.REQUEST_TYPE.ADD;
 
         // Pass the update request to the requester object
-        mDetectionRequester.requestUpdates();
+        mGoogleActivityDetectionRequester.requestUpdates();
     }
 
     /**
@@ -1585,17 +1692,14 @@ private double calVelocityIncrease()
         mRequestType = Constants.REQUEST_TYPE.REMOVE;
 
         // Pass the remove request to the remover object
-        mDetectionRemover.removeUpdates(mDetectionRequester.getRequestPendingIntent());
+        mGoogleActivityDetectionRemover.removeUpdates(mGoogleActivityDetectionRequester.getRequestPendingIntent());
 
         /*
          * Cancel the PendingIntent. Even if the removal request fails, canceling the PendingIntent
          * will stop the updates.
          */
-        PendingIntent pIntent=mDetectionRequester.getRequestPendingIntent();
+        PendingIntent pIntent=mGoogleActivityDetectionRequester.getRequestPendingIntent();
         if(pIntent!=null) pIntent.cancel();
-        
-        //Stop listening to accelerometer readings
-        mSensorManager.unregisterListener(mSensorEventListener);
         
     }
 

@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package com.updetector.sensorlist;
+package com.updetector.google.activityrecognition;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import android.R.integer;
 import android.app.IntentService;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -30,9 +31,11 @@ import android.content.SharedPreferences.Editor;
 import android.location.Location;
 import android.provider.Settings;
 import android.support.v4.app.NotificationCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
 import com.updetector.Constants;
+import com.updetector.MainActivity;
 import com.updetector.R;
 import com.updetector.R.drawable;
 import com.updetector.R.string;
@@ -141,8 +144,19 @@ public class ActivityRecognitionIntentService extends IntentService {
             
             // Log the update
             logActivityRecognitionResult(result, curLocation);
+            
+           sendActivityUpdateToMainActivity(getNameFromType(activityType), confidence);
         }
     }
+    
+    private void sendActivityUpdateToMainActivity(String mobilityState, int confidence){
+		Log.e(LOG_TAG, "Send out the google activity update back to main activity\n " +
+				"most likely activity:  "+mobilityState+"   confidence: "+confidence);
+		Intent ackIntent = new Intent(MainActivity.GOOGLE_ACTIVITY_RECOGNITION_UPDATE);
+		ackIntent.putExtra(MainActivity.GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_TYPE, mobilityState);
+		ackIntent.putExtra(MainActivity.GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_CONFIDENCE, confidence);
+		LocalBroadcastManager.getInstance(this).sendBroadcast(ackIntent);
+	}
     
     /**
      * Tests to see if the activity has changed

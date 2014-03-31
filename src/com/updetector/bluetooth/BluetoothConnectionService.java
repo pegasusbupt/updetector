@@ -1,4 +1,4 @@
-package com.updetector.sensorlist;
+package com.updetector.bluetooth;
 
 import com.updetector.Constants;
 import com.updetector.MainActivity;
@@ -135,8 +135,8 @@ public class BluetoothConnectionService extends Service {
 	
 	private void sendConnectionChangeNotificationToMainActivity(int eventCode){
 		Log.e(LOG_TAG, "Send out the connection change notice ");
-		Intent ackIntent = new Intent(MainActivity.BLUETOOTH_CONNECTION_ACK);
-		ackIntent.putExtra(MainActivity.EXTRA_MESSAGE, eventCode);
+		Intent ackIntent = new Intent(MainActivity.BLUETOOTH_CONNECTION_UPDATE);
+		ackIntent.putExtra(MainActivity.BLUETOOTH_CON_UPDATE_EVENT_CODE, eventCode);
 		LocalBroadcastManager.getInstance(this).sendBroadcast(ackIntent);
 	}
 	
@@ -187,8 +187,8 @@ public class BluetoothConnectionService extends Service {
 		
 	
 	public void writeToMainActivity(String str) {
-		Intent ackIntent = new Intent(MainActivity.BLUETOOTH_CONNECTION_ACK);
-		ackIntent.putExtra(MainActivity.EXTRA_MESSAGE, str);
+		Intent ackIntent = new Intent(MainActivity.BLUETOOTH_CONNECTION_UPDATE);
+		ackIntent.putExtra(MainActivity.BLUETOOTH_CON_UPDATE_EVENT_CODE, str);
 		LocalBroadcastManager.getInstance(this).sendBroadcast(ackIntent);
 	}
 }

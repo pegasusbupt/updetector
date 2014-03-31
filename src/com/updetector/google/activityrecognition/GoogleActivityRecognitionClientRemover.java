@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package com.updetector;
+package com.updetector.google.activityrecognition;
 
+import com.updetector.Constants;
 import com.updetector.R;
+import com.updetector.R.string;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.GooglePlayServicesClient.ConnectionCallbacks;
@@ -42,9 +44,9 @@ import android.util.Log;
  * To use a DetectionRemover, instantiate it, then call removeUpdates().
  *
  */
-public class DetectionRemover
+public class GoogleActivityRecognitionClientRemover
         implements ConnectionCallbacks, OnConnectionFailedListener {
-	private final String TAG=DetectionRemover.class.getCanonicalName(); 
+	private final String TAG=GoogleActivityRecognitionClientRemover.class.getCanonicalName(); 
 	
     // Storage for a context from the calling client
     private Context mContext;
@@ -61,7 +63,7 @@ public class DetectionRemover
      *
      * @param context A valid Context
      */
-    public DetectionRemover(Context context) {
+    public GoogleActivityRecognitionClientRemover(Context context) {
         // Save the context
         mContext = context;
 

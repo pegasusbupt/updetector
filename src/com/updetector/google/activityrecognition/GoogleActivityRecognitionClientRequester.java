@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package com.updetector;
+package com.updetector.google.activityrecognition;
 
+import com.updetector.Constants;
 import com.updetector.R;
-import com.updetector.sensorlist.ActivityRecognitionIntentService;
+import com.updetector.R.string;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.GooglePlayServicesClient.ConnectionCallbacks;
@@ -44,9 +45,9 @@ import android.util.Log;
  * automatically.
  *
  */
-public class DetectionRequester
+public class GoogleActivityRecognitionClientRequester
         implements ConnectionCallbacks, OnConnectionFailedListener {
-	public static final String LOG_TAG=DetectionRequester.class.getCanonicalName();
+	public static final String LOG_TAG=GoogleActivityRecognitionClientRequester.class.getCanonicalName();
 
     // Storage for a context from the calling client
     private Context mContext;
@@ -57,7 +58,7 @@ public class DetectionRequester
     // Stores the current instantiation of the activity recognition client
     private ActivityRecognitionClient mActivityRecognitionClient;
 
-    public DetectionRequester(Context context) {
+    public GoogleActivityRecognitionClientRequester(Context context) {
         // Save the context
         mContext = context;
 
