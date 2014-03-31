@@ -127,7 +127,6 @@ import com.updetector.viewadapters.MarkerInfoWindowAdapter;
  */
 public class MainActivity extends FragmentActivity implements ConnectionCallbacks, OnConnectionFailedListener
  {
-	public static String locl;
 	public static final String LOG_TAG=MainActivity.class.getCanonicalName();
 	
 	private static final String LOCK_TAG="ACCELEROMETER_MONITOR";
