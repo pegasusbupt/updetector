@@ -1,0 +1,17 @@
+/data
+/bin
+/res
+/gen
+/assets
+/exp
+/libs
+
+/AndroidManifest.xml
+/dev_log.docx
+/ic_launcher-web.png
+/Learning_Notes.txt
+/lint.xml
+/project.properties
+/README.md
+/.project
+/.classpath
