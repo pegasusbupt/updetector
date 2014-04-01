@@ -107,16 +107,19 @@ public class ActivityRecognitionIntentService extends IntentService {
 
             // Get the most probable activity from the list of activities in the update
             DetectedActivity mostProbableActivity = result.getMostProbableActivity();
-
+           
             // Get the confidence percentage for the most probable activity
-            int confidence = mostProbableActivity.getConfidence();
+            int confidenceOfMostProbableActivity = mostProbableActivity.getConfidence();
 
+            int confidenceOfOnFoot=result.getActivityConfidence(DetectedActivity.ON_FOOT);
+            int confidenceOfInVehicle=result.getActivityConfidence(DetectedActivity.IN_VEHICLE);
+            
             // Get the type of activity
-            int activityType = mostProbableActivity.getType();
+            int mostProbableActivityType = mostProbableActivity.getType();
 
             Location curLocation=null;
             
-        	if (
+        	/*if (
                    // If the current type is "moving"
                    isMoving(activityType)
                    &&
@@ -143,18 +146,23 @@ public class ActivityRecognitionIntentService extends IntentService {
             editor.commit();
             
             // Log the update
-            logActivityRecognitionResult(result, curLocation);
+            logActivityRecognitionResult(result, curLocation);*/
             
-           sendActivityUpdateToMainActivity(getNameFromType(activityType), confidence);
+           sendActivityUpdateToMainActivity(mostProbableActivityType, getNameFromType(mostProbableActivityType), confidenceOfMostProbableActivity
+        		   , confidenceOfOnFoot, confidenceOfInVehicle);
         }
     }
     
-    private void sendActivityUpdateToMainActivity(String mobilityState, int confidence){
+    private void sendActivityUpdateToMainActivity(int mostProbableActivityTypeInt, String mobilityState, int confidenceOfMostProbableActivity, int confidenceOfOnFoot, int confidenceOfInVehicle){
 		Log.e(LOG_TAG, "Send out the google activity update back to main activity\n " +
-				"most likely activity:  "+mobilityState+"   confidence: "+confidence);
-		Intent ackIntent = new Intent(MainActivity.GOOGLE_ACTIVITY_RECOGNITION_UPDATE);
-		ackIntent.putExtra(MainActivity.GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_TYPE, mobilityState);
-		ackIntent.putExtra(MainActivity.GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_CONFIDENCE, confidence);
+				"most likely activity:  "+mobilityState+"   confidence: "+confidenceOfMostProbableActivity);
+		Intent ackIntent = new Intent(Constants.GOOGLE_ACTIVITY_RECOGNITION_UPDATE);
+		ackIntent.putExtra(Constants.GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_TYPE, mobilityState);
+		ackIntent.putExtra(Constants.GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_TYPE_INT, mostProbableActivityTypeInt);
+		ackIntent.putExtra(Constants.GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_CONFIDENCE, (float)confidenceOfMostProbableActivity);
+		ackIntent.putExtra(Constants.GOOGLE_ACT_UPDATE_ON_FOOT_ACTIVITY_CONFIDENCE, (float)confidenceOfOnFoot);
+		ackIntent.putExtra(Constants.GOOGLE_ACT_UPDATE_IN_VEHICLE_ACTIVITY_CONFIDENCE, (float)confidenceOfInVehicle);
+		
 		LocalBroadcastManager.getInstance(this).sendBroadcast(ackIntent);
 	}
     

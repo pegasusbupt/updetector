@@ -30,6 +30,7 @@ import android.app.Dialog;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.IntentSender.SendIntentException;
 import android.os.Bundle;
 import android.util.Log;
@@ -100,8 +101,12 @@ public class GoogleActivityRecognitionClientRequester
          * Request updates, using the default detection interval.
          * The PendingIntent sends updates to ActivityRecognitionIntentService
          */
+    	final SharedPreferences mPrefs = mContext.getSharedPreferences(Constants.SHARED_PREFERENCES,  Context.MODE_PRIVATE);
+    	long updateInterval=mPrefs.getLong(Constants.PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL, 
+    			Constants.GOOGLE_ACTIVITY_UPDATE_INTERVAL_DEFAULT_VALUE);
+    	
         getActivityRecognitionClient().requestActivityUpdates(
-                Constants.GOOGLE_API_DETECTION_INTERVAL_MILLISECONDS,
+                updateInterval,
                 createRequestPendingIntent());
 
         // Disconnect the client
@@ -148,7 +153,7 @@ public class GoogleActivityRecognitionClientRequester
     @Override
     public void onConnected(Bundle arg0) {
         // If debugging, log the connection
-        Log.d(Constants.APP_NAME, mContext.getString(R.string.connected));
+        Log.d(LOG_TAG, mContext.getString(R.string.connected));
 
         // Continue the process of requesting activity recognition updates
         continueRequestActivityUpdates();

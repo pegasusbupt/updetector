@@ -135,8 +135,8 @@ public class BluetoothConnectionService extends Service {
 	
 	private void sendConnectionChangeNotificationToMainActivity(int eventCode){
 		Log.e(LOG_TAG, "Send out the connection change notice ");
-		Intent ackIntent = new Intent(MainActivity.BLUETOOTH_CONNECTION_UPDATE);
-		ackIntent.putExtra(MainActivity.BLUETOOTH_CON_UPDATE_EVENT_CODE, eventCode);
+		Intent ackIntent = new Intent(Constants.BLUETOOTH_CONNECTION_UPDATE);
+		ackIntent.putExtra(Constants.BLUETOOTH_CON_UPDATE_EVENT_CODE, eventCode);
 		LocalBroadcastManager.getInstance(this).sendBroadcast(ackIntent);
 	}
 	
@@ -187,8 +187,8 @@ public class BluetoothConnectionService extends Service {
 		
 	
 	public void writeToMainActivity(String str) {
-		Intent ackIntent = new Intent(MainActivity.BLUETOOTH_CONNECTION_UPDATE);
-		ackIntent.putExtra(MainActivity.BLUETOOTH_CON_UPDATE_EVENT_CODE, str);
+		Intent ackIntent = new Intent(Constants.BLUETOOTH_CONNECTION_UPDATE);
+		ackIntent.putExtra(Constants.BLUETOOTH_CON_UPDATE_EVENT_CODE, str);
 		LocalBroadcastManager.getInstance(this).sendBroadcast(ackIntent);
 	}
 }

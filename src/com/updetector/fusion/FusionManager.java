@@ -196,7 +196,7 @@ public class FusionManager {
   			}
   		}
   		
-  		double detectionThreshold=mPrefs.getFloat(Constants.NOTIFICATION_THRESHOLD, (float)Constants.DEFAULT_DETECTION_THRESHOLD);
+  		double detectionThreshold=mPrefs.getFloat(Constants.PREFERENCE_KEY_NOTIFICATION_THRESHOLD, (float)Constants.DEFAULT_DETECTION_THRESHOLD);
   		/* if the outcome is parking/unparking it must exceed certain threshold*/
   		if((ret==Constants.OUTCOME_PARKING&&maxLikelihood<detectionThreshold)
   				&&(ret==Constants.OUTCOME_UNPARKING&&maxLikelihood<detectionThreshold-0.1)){

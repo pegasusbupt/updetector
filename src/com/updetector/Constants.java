@@ -24,9 +24,9 @@ public final class Constants {
 		 */
 		// Formats the timestamp in the log
 		
-		public static final int ONE_SECOND=1000;
-    	public static final int THREE_SECONDS= ONE_SECOND * 3;
-		public static final long TEN_SECONDS = ONE_SECOND * 10;
+		public static final int ONE_SECOND_IN_MILLISECOND=1000;
+    	public static final int THREE_SECONDS= ONE_SECOND_IN_MILLISECOND * 3;
+		public static final long TEN_SECONDS = ONE_SECOND_IN_MILLISECOND * 10;
 		public static final long ONE_MINUTE = TEN_SECONDS * 6;
 		public static final long FIVE_MINUTE = ONE_MINUTE * 5;
 		public static final long THIRTY_MINUTE = ONE_MINUTE * 30;
@@ -412,7 +412,7 @@ public final class Constants {
 	  
 	    public static final int MAX_LOG_SIZE = 100000; //GAME mode: about 37.5*60 records per second
 	    
-	    public static final int DETECTION_INTERVAL_IN_SECOND=ONE_SECOND*5/1000; //any two parking/unparking activities detection should at least be this apart
+	    public static final int DETECTION_INTERVAL_DEFAULT_VALUE_IN_MILLISEC=ONE_SECOND_IN_MILLISECOND*5; //any two parking/unparking activities detection should at least be this apart
 	    
 	    public static final String PARKING_NOTIFICATION="Parking at";
 	    public static final String UNPARKING_NOTIFICATION="Unparking at";
@@ -457,12 +457,12 @@ public final class Constants {
 		public static final String LOGGING_DETECTION_SWITCH="DETECTION REPORT";
 		public static final String LOGGING_ENVIRON_SWITCH="ENVIRON REPORT";
 		
-		public static final String CIV_CLASSIFIER_ON="USE CLASSIFIER FOR CIV INDICATOR";
-		public static final String CIV_DELTA_CONDITIONAL_PROBABILITY="DELTA FOR CONDITIONAL PROBABILITY";
+		public static final String PREFERENCE_KEY_CIV_CLASSIFIER_ON="USE CLASSIFIER FOR CIV INDICATOR";
+		public static final String PREFERENCE_KEY_CIV_DELTA_CONDITIONAL_PROBABILITY="DELTA FOR CONDITIONAL PROBABILITY";
 
-		public static final String IS_OUTDOOR="SET CURRENT ENVIRONMENT TO BE OUTDOOR";
-		public static final String NOTIFICATION_THRESHOLD="DETECTION THRESHOLD";
-		public static final String DETECTION_INTERVAL="DETECTION INTERVAL";
+	
+		public static final String PREFERENCE_KEY_NOTIFICATION_THRESHOLD="DETECTION THRESHOLD";
+		public static final String PREFERENCE_KEY_DETECTION_INTERVAL_IN_MILLISEC="DETECTION INTERVAL";
 		
 	    // Shared Preferences repository name
 		public static final String SHARED_PREFERENCES =DEFAULT_PACKAGE_NAME+".SHARED_PREFERENCES";
@@ -489,6 +489,36 @@ public final class Constants {
 		public static final String KEY_PREVIOUS_ACTIVITY_TYPE =DEFAULT_PACKAGE_NAME+".KEY_PREVIOUS_ACTIVITY_TYPE";
 		public static final String KEY_PREVIOUS_CONSECUTIVE_ON_FOOT_COUNT=DEFAULT_PACKAGE_NAME+".KEY_PREVIOUS_CONSECUTIVE_ON_FOOT_COUNT";
 		
+		
+		
+		
+		/*****************************************
+		 * Strings for communications between services and activities    
+		 ***********************************************/
+		public static final String BLUETOOTH_CONNECTION_UPDATE = "BLUETOOTH_CONNECTION_ACK";
+		public static final String BLUETOOTH_CON_UPDATE_EVENT_CODE = "EVENT_CODE";
+		
+		
+		/********************************
+		 * Google Activity Recognition Related
+		 ******************************/
+//shared preference
+		public static final String PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL="PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL"; 
+		public static final int GOOGLE_ACTIVITY_UPDATE_INTERVAL_DEFAULT_VALUE=5;
+		public static final String PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION="PREFERENCE_KEY_GOOGLE_ACTIVITY_IN_FUSION";
+		
+		//communicate btw activity service and main activity 
+		public static final String GOOGLE_ACTIVITY_RECOGNITION_UPDATE="GOOGLE_ACTIVITY_RECOGNITION_UPDATE";
+		public static final String GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_TYPE="MOST_LIKELY_ACTIVITY_TYPE";
+		public static final String GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_TYPE_INT="MOST_LIKELY_ACTIVITY_TYPE_INT";
+		public static final String GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_CONFIDENCE="MOST_LIKELY_ACTIVITY_CONFIDENCE";
+		public static final String GOOGLE_ACT_UPDATE_ON_FOOT_ACTIVITY_CONFIDENCE="GOOGLE_ACT_UPDATE_ON_FOOT_ACTIVITY_CONFIDENCE";
+		public static final String GOOGLE_ACT_UPDATE_IN_VEHICLE_ACTIVITY_CONFIDENCE="GOOGLE_ACT_UPDATE_IN_VEHICLE_ACTIVITY_CONFIDENCE";
+		
+		//
+		public static final int GOOGLE_ACTIVITY_LAST_STATE_NO=20;
+		public static final long EXPIRATION_TIME_FOR_GOOGLE_IN_VEHICLE_STATE_IN_MILLISEC=ONE_MINUTE;
+		
 		/************************************************
 	     * IODetector Related
 	     **************************************************/
@@ -496,6 +526,7 @@ public final class Constants {
 		public static final double IODETECTOR_WEIGHT_MAGNET=0.25;
 		public static final double IODETECTOR_WEIGHT_CELLULAR=0.35;
 		
+		public static final String PREFERENCE_KEY_IS_OUTDOOR="SET CURRENT ENVIRONMENT TO BE OUTDOOR";
 		
 		/************************************************
 	     * Classifier Related
@@ -540,13 +571,7 @@ public final class Constants {
 			    
 			public static final double ALPHA=0.8; //used to compute linear acceleration
 	        
-				/**
-				 * Google API paras: Constants used to establish the activity update interval
-				 */
-			    public static final int MILLISECONDS_PER_SECOND = 1000;
-			    public static final int GOOGLE_API_DETECTION_INTERVAL_SECONDS = 20;
-			    public static final int GOOGLE_API_DETECTION_INTERVAL_MILLISECONDS = MILLISECONDS_PER_SECOND * GOOGLE_API_DETECTION_INTERVAL_SECONDS;
-			
+				
 			/**
 			 * Microphone setting
 			 */
