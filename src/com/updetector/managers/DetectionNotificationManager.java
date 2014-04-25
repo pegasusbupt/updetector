@@ -1,15 +1,25 @@
 package com.updetector.managers;
 
+import java.util.Date;
+import java.util.Vector;
+
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
+import com.updetector.CommonUtils;
 import com.updetector.Constants;
+import com.updetector.MainActivity;
 import com.updetector.R;
 import com.updetector.R.drawable;
 import com.updetector.R.raw;
 import com.updetector.R.string;
+import com.updetector.blocksmap.ParkingBlock;
 import com.skyhookwireless.wps.WPSLocation;
 
 import android.R.integer;
@@ -23,25 +33,33 @@ import android.media.MediaPlayer.OnVideoSizeChangedListener;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
-public class EventDetectionNotificationManager {
-	public static final String LOG_TAG=EventDetectionNotificationManager.class.getCanonicalName();
+public class DetectionNotificationManager {
+	public static final String LOG_TAG=DetectionNotificationManager.class.getCanonicalName();
 	
 	private Context mContext;
 	
-	public static EventDetectionNotificationManager mNotificationManagerInstanceManager;
+	public static DetectionNotificationManager mNotificationManagerInstanceManager;
 	
 	
 	
-	private EventDetectionNotificationManager(Context ctxt){
+	private DetectionNotificationManager(Context ctxt){
 		mContext=ctxt;
 	}
 	
-	public static EventDetectionNotificationManager getInstance(Context ctxt) {
+	public static DetectionNotificationManager getInstance(Context ctxt) {
 		if(mNotificationManagerInstanceManager==null){
-			mNotificationManagerInstanceManager=new EventDetectionNotificationManager(ctxt);
+			mNotificationManagerInstanceManager=new DetectionNotificationManager(ctxt);
 		}
 		return mNotificationManagerInstanceManager;
 	}
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	/**
      * Post a parking/unparking detected notification to the user. 

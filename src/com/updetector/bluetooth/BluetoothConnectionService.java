@@ -4,7 +4,7 @@ import com.updetector.Constants;
 import com.updetector.MainActivity;
 import com.updetector.R;
 import com.updetector.R.raw;
-import com.updetector.managers.EventDetectionNotificationManager;
+import com.updetector.managers.DetectionNotificationManager;
 
 import android.R.integer;
 import android.R.string;
@@ -36,7 +36,7 @@ public class BluetoothConnectionService extends Service {
 	
 	
 	private Location parkingPlace = null;
-	private EventDetectionNotificationManager mNotificationManagerWrapper;
+	private DetectionNotificationManager mNotificationManagerWrapper;
 	
 	@Override
 	public IBinder onBind(Intent arg0) {
@@ -112,7 +112,7 @@ public class BluetoothConnectionService extends Service {
 		registerReceiver(mReceiver, filter_connected);
 		registerReceiver(mReceiver, filter_disconnected);
 		
-		mNotificationManagerWrapper=EventDetectionNotificationManager.getInstance(this);
+		mNotificationManagerWrapper=DetectionNotificationManager.getInstance(this);
 		
 		Log.e(LOG_TAG, "Service started for device. ");
 		//writeToMainActivity("Bluetooth connection service started.\n\n");

@@ -12,9 +12,11 @@ import org.achartengine.renderer.XYSeriesRenderer;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.telephony.CellLocation;
 import android.telephony.NeighboringCellInfo;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
+import android.telephony.cdma.CdmaCellLocation;
 import android.telephony.gsm.GsmCellLocation;
 import android.util.SparseIntArray;
 
@@ -42,7 +44,8 @@ public class CellTowerChart {
 	}
 
 	TelephonyManager telephonyManager;
-	GsmCellLocation cellLocation;
+	//GsmCellLocation cellLocation;
+	CellLocation cellLocation;
 
 	private DetectionProfile[] listProfile = new DetectionProfile[3];
 	private DetectionProfile indoor, semi, outdoor;
@@ -86,8 +89,13 @@ public class CellTowerChart {
 		listProfile[2]=outdoor;
 
 		telephonyManager.listen(phoneStateListener,PhoneStateListener.LISTEN_SIGNAL_STRENGTH);
-		cellLocation = (GsmCellLocation)telephonyManager.getCellLocation();
-		currentCID = cellLocation.getCid();
+		cellLocation = telephonyManager.getCellLocation();
+		int phoneType = telephonyManager.getPhoneType();
+		if (phoneType == TelephonyManager.PHONE_TYPE_GSM)
+			currentCID = ((GsmCellLocation)cellLocation).getCid();
+		else if (phoneType == TelephonyManager.PHONE_TYPE_CDMA)
+			currentCID = ((CdmaCellLocation)cellLocation).getBaseStationId();
+
 		connectedCellSeries = new XYSeries(Integer.toString(currentCID));
 
 		mDataset.addSeries(connectedCellSeries);
@@ -126,8 +134,12 @@ public class CellTowerChart {
 
 	public GraphicalView getView(){
 
-		cellLocation = (GsmCellLocation)telephonyManager.getCellLocation();
-		currentCID = cellLocation.getCid();
+		cellLocation = telephonyManager.getCellLocation();
+		int phoneType = telephonyManager.getPhoneType();
+		if (phoneType == TelephonyManager.PHONE_TYPE_GSM)
+			currentCID = ((GsmCellLocation)cellLocation).getCid();
+		else if (phoneType == TelephonyManager.PHONE_TYPE_CDMA)
+			currentCID = ((CdmaCellLocation)cellLocation).getBaseStationId();
 		connectedCellSeries.setTitle(Integer.toString(currentCID));
 		connectedCellSeries.add(time, currentSignalStrength);
 		if(connectedCellSeries.getItemCount()>25)
@@ -142,8 +154,12 @@ public class CellTowerChart {
 	public String getCellTowerInfo()
 	{
 		//Connected Cell Tower
-		cellLocation = (GsmCellLocation)telephonyManager.getCellLocation();
-		currentCID = cellLocation.getCid();
+		cellLocation = telephonyManager.getCellLocation();
+		int phoneType = telephonyManager.getPhoneType();
+		if (phoneType == TelephonyManager.PHONE_TYPE_GSM)
+			currentCID = ((GsmCellLocation)cellLocation).getCid();
+		else if (phoneType == TelephonyManager.PHONE_TYPE_CDMA)
+			currentCID = ((CdmaCellLocation)cellLocation).getBaseStationId();
 		return "Connected id: " + currentCID + ", RSSI:" + currentSignalStrength + "dBm";
 	}
 

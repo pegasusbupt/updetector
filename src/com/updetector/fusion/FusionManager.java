@@ -160,7 +160,7 @@ public class FusionManager {
 	  	fusionProcessLog.append("After Normalization: "+Arrays.toString(outcomeLikelihood)+"\n");
   		
 	  	if(logOn&&logDetectionOn&&mLogManager!=null){
-				mLogManager.log(fusionProcessLog.toString(), Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
+				//mLogManager.log(fusionProcessLog.toString(), Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
 		}
   		
   		return outcomeLikelihood;

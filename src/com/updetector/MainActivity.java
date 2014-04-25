@@ -62,6 +62,8 @@ import android.net.NetworkInfo.State;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.TextToSpeech.OnInitListener;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.LocalBroadcastManager;
 import android.telephony.TelephonyManager;
@@ -120,7 +122,7 @@ import com.updetector.indicator.iodetector.DetectionProfile;
 import com.updetector.indicator.iodetector.LightChart;
 import com.updetector.indicator.iodetector.MagnetChart;
 import com.updetector.managers.AudioRecordManager;
-import com.updetector.managers.EventDetectionNotificationManager;
+import com.updetector.managers.DetectionNotificationManager;
 import com.updetector.managers.LogManager;
 import com.updetector.managers.WakeLockManager;
 import com.updetector.sensorlist.Sensors;
@@ -138,7 +140,7 @@ import com.updetector.bluetooth.BluetoothConnectionService;
  * An IntentService receives activity detection updates in the background
  * so that detection can continue even if the Activity is not visible.
  */
-public class MainActivity extends FragmentActivity implements ConnectionCallbacks, OnConnectionFailedListener
+public class MainActivity extends FragmentActivity implements ConnectionCallbacks, OnConnectionFailedListener, OnInitListener
  {
 	public static final String LOG_TAG=MainActivity.class.getCanonicalName();
 	
@@ -156,10 +158,13 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
     public static final String STATE_PREFIX="Motion State Classified : ";
     public static final String GOOGLE_MOBILITY_STATE_PREFIX="Motion State Google : ";
     public static final String INDICATOR_PREFIX="Indicator : "; 
+   
     private GoogleMap mMap;
-
-    
     Vector<ParkingBlock> parkingBlocks = null;
+    
+    
+    private TextToSpeech mTextToSpeech;
+    
     
 	/**
      * Holds activity recognition data, in the form of
@@ -188,7 +193,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
     private LogManager mLogManager;
 
     // Instance of customized notification manager
-    private EventDetectionNotificationManager mEventDetectionNotificationManager;
+    private DetectionNotificationManager mDetectionNotificationManager;
     
     // The wake lock manager object
     private WakeLockManager mWakeLockManager;
@@ -203,9 +208,10 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
     /**
      * MST
      */
-  	private PastMotionState mPastGoogleActivities=new PastMotionState(Source.Google, Constants.GOOGLE_ACTIVITY_LAST_STATE_NO);
-  	private PastMotionState mPastClassifiedMotionStates=new PastMotionState(Source.Classifier, Constants.NO_OF_PAST_STATES_STORED);
+  	private PastMotionStates mPastGoogleActivities=new PastMotionStates(Source.Google, Constants.GOOGLE_ACTIVITY_LAST_STATE_NO);
+  	private PastMotionStates mPastClassifiedMotionStates=new PastMotionStates(Source.Classifier, Constants.NO_OF_PAST_STATES_STORED);
   	private CachedDetectionList mCachedUnparkingDetectionList=new CachedDetectionList(CachedDetection.Type.Unparking);
+  	private CachedDetectionList mCachedParkingDetectionList=new CachedDetectionList(CachedDetection.Type.Parking);
   	
     private double[] lastClassifiedMotionStateDistr=null;
     private double[] lastAccReading;
@@ -266,7 +272,8 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 
 		@Override
 		public void onLocationChanged(Location location) {
-			(new GetAddressTask(eventCode)).execute(location);
+			new GetAddressTask(eventCode).execute(location);
+			//onLocationRetrieved(eventCode, location, null);
 		}
 	}
 	
@@ -373,7 +380,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	        	int eventCode = intent.getIntExtra(Constants.BLUETOOTH_CON_UPDATE_EVENT_CODE, Constants.OUTCOME_NONE);
 	        	System.out.println(eventCode);
 				
-				Toast.makeText(getApplicationContext(), "\ndetected "+CommonUtils.eventCodeToString(eventCode)+" at time: "+CommonUtils.formatTimestamp( new Date(), "HH:mm:ss" ), Toast.LENGTH_LONG).show();
+				//Toast.makeText(getApplicationContext(), "\ndetected "+CommonUtils.eventCodeToString(eventCode)+" at time: "+CommonUtils.formatTimestamp( new Date(), "HH:mm:ss" ), Toast.LENGTH_LONG).show();
 
 	        	
 	        	// retrieve a location then
@@ -393,26 +400,61 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	        		float onFootConfidence=intent.getFloatExtra(Constants.GOOGLE_ACT_UPDATE_ON_FOOT_ACTIVITY_CONFIDENCE, 0);
 	        		float inVehicleConfidence=intent.getFloatExtra(Constants.GOOGLE_ACT_UPDATE_IN_VEHICLE_ACTIVITY_CONFIDENCE, 0);
 	        		
+	        		//little correction to the UNKNOWN state
 	        		int mostLikelyActivityType=intent.getIntExtra(Constants.GOOGLE_ACT_UPDATE_MOST_LIKELY_ACTIVITY_TYPE_INT, DetectedActivity.UNKNOWN);
-	        		if(mostLikelyActivityType==DetectedActivity.UNKNOWN
-	        				&&inVehicleConfidence>100-inVehicleConfidence-mostLikelyActivityConfidence){
-	        			mostLikelyActivityType=DetectedActivity.IN_VEHICLE;
+	        		if(mostLikelyActivityType==DetectedActivity.UNKNOWN){
+	        				if(inVehicleConfidence>100-inVehicleConfidence-mostLikelyActivityConfidence) 
+	        					mostLikelyActivityType=DetectedActivity.IN_VEHICLE;
+	        				else{
+	        					if(onFootConfidence>100-onFootConfidence-mostLikelyActivityConfidence)
+	        						mostLikelyActivityType=DetectedActivity.ON_FOOT;
+	        				}
 	        		}
-	        		boolean isFirstInVehicleState=mPastGoogleActivities.add(mostLikelyActivityType);
-	        		if(isFirstInVehicleState){
-		        		CachedDetection oldestNotExpiredUnparkingDetection=mCachedUnparkingDetectionList.get(0);
-		        		if(oldestNotExpiredUnparkingDetection!=null){
-		        			onDetectionConfirmed(Constants.OUTCOME_UNPARKING, oldestNotExpiredUnparkingDetection.location, oldestNotExpiredUnparkingDetection.address);
+	        		MotionState.Type activityType=MotionState.translate(mostLikelyActivityType);
+	        		mPastGoogleActivities.add(activityType);
+	        			
+	        		if(activityType==MotionState.Type.IN_VEHICLE
+	        	||activityType==MotionState.Type.ON_FOOT){
+	        			int outcome;
+	        			CachedDetection oldestNotExpiredCachedDetection=null;
+	        			if(activityType==MotionState.Type.IN_VEHICLE){
+	        				outcome=Constants.OUTCOME_UNPARKING;
+	        				oldestNotExpiredCachedDetection=mCachedUnparkingDetectionList.get(0);
+	        			}else{
+	        				outcome=Constants.OUTCOME_PARKING;
+	        				oldestNotExpiredCachedDetection=mCachedParkingDetectionList.get(0);
+	        			}
+		        
+		        		if(mPastGoogleActivities.isTransitionTo(activityType)
+		        				&&oldestNotExpiredCachedDetection!=null){
+		        			 onDetectionConfirmed(outcome,
+		        					 oldestNotExpiredCachedDetection.timestamp,
+		        					 oldestNotExpiredCachedDetection.location,
+		        					 oldestNotExpiredCachedDetection.address);
 		        		}
+
 	        		}
+	        		
 	        		
 	        		//update the textview
 	        		googleStateTextView.setText(GOOGLE_MOBILITY_STATE_PREFIX+mostLikelyActivity+" conf:"+mostLikelyActivityConfidence
 	        				+ "  f:"+onFootConfidence+",v:"+inVehicleConfidence);
 	        		
+	        		//log the update
+	        		SharedPreferences mPrefs=getSharedPreferences(Constants.SHARED_PREFERENCES, 0);
+	    			boolean logOn=mPrefs.getBoolean(Constants.LOGGING_ON, false);
+	        		boolean logGoogActUpdatesOn=mPrefs.getBoolean(Constants.LOGGING_GOOGLE_ACTIVITY_UPDATE, false);
+					if(logOn&&logGoogActUpdatesOn){
+						// log the Change-In-Variance Classifier predicated result
+						mLogManager.log(
+								new SimpleDateFormat("yyyy-MM-dd kk:mm:ss:SSS", Locale.US).format(Calendar.getInstance().getTime())+" "+activityType.toString(),
+								Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_GOOGLE_ACT_UPDATE]);
+					}
+	        		
+	        		
 	        		
 	        		//build the new MST vector
-	        		double[] probsOfNewUpdate=null;
+	        		/*double[] probsOfNewUpdate=null;
 	        		if(probOfOnFootAndInVehicleOfLastUpdate!=null){
 	        			probsOfNewUpdate=new double[]{onFootConfidence/100, inVehicleConfidence/100};
 	        			ArrayList<Double> features=new ArrayList<Double>();
@@ -425,7 +467,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	        			mstVector.put(Constants.INDICATOR_MST, features);
 	        			Log.d(LOG_TAG, "Google MST Vector: "+features.toString());
 	        		}
-	        		probOfOnFootAndInVehicleOfLastUpdate=probsOfNewUpdate;
+	        		probOfOnFootAndInVehicleOfLastUpdate=probsOfNewUpdate;*/
 	        	}
 	        }
 	    }
@@ -433,13 +475,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	
 	//accelerometer feature window and its neighboring windows
 	private ArrayList<AccelerometerFeature> civVectorsWithinScope=new ArrayList<AccelerometerFeature>();
-	
-	
-  
-    
-   
-    
-    
+	 
     
     //TODO mSensnorEvent
     @SuppressLint("UseSparseArrays")
@@ -457,69 +493,68 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 					lastAccReading[i]=event.values[i];
 				}
 			}
-			if(!readingChanged) return;
-						
+			if(!readingChanged) return;						
 			acceleometerSeq=(acceleometerSeq+1)%Integer.MAX_VALUE;
-	        // requires a wake lock 
+	        
+			
+			// requires a wake lock 
 	        mWakeLockManager.lock(LOCK_TAG);
+				
+			//initialization 
+			SharedPreferences mPrefs=getSharedPreferences(Constants.SHARED_PREFERENCES, 0);
+			int outcome=Constants.OUTCOME_NONE;
+			
 			
 			/**
-	  		 * Get the parameter values from the preference
-	  		 */
-			SharedPreferences mPrefs=getSharedPreferences(Constants.SHARED_PREFERENCES, 0);
-	  		boolean classifierForCIVOn=mPrefs.getBoolean(Constants.PREFERENCE_KEY_CIV_CLASSIFIER_ON, false);
+			 * Log  raw reading option
+			 */
 			boolean logOn=mPrefs.getBoolean(Constants.LOGGING_ON, false);
-			boolean isOutdoor=mPrefs.getBoolean(Constants.PREFERENCE_KEY_IS_OUTDOOR, false);
-			
-			
-			// log the raw readings
-			String record=CommonUtils.buildALogRecordForNewAccelerometerReadings(event);
-			if(record!=null) phoneNotStill=true;
-			else phoneNotStill=false;
-			
 			boolean logRawOn=mPrefs.getBoolean(Constants.LOGGING_ACCL_RAW_SWITCH, false);
 			if(logOn&&logRawOn){
+				String record=CommonUtils.buildALogRecordForNewAccelerometerReadings(event);
+				if(record!=null) phoneNotStill=true;
+				else phoneNotStill=false;
 				mLogManager.log(record, Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_ACCEL_RAW]);
 			}			
-			int outcome=Constants.OUTCOME_NONE;
-			//conditions for early exit based on environment
 			
-			if( 
+			
+			//stop analyzing accelerometer based on environment conditions
+			boolean manuallySetToOutdoor=mPrefs.getBoolean(Constants.PREFERENCE_KEY_IS_OUTDOOR, false);
+			if( !manuallySetToOutdoor&&
 				(lastEnvironment==Constants.ENVIRON_INDOOR&&probabilityOfLastEnvironment>0.8)
 				//|| !pastMotionStates.contains((Integer)Constants.STATE_DRIVING)
 			){
-				if(!isOutdoor)//not set to outdoor environment
 					return;
 			}
 			
-			/*boolean localDebug=true;//TODO for debug only
-			if(localDebug) return;
-			*/
-			boolean useGoogleActivityInFusion=mPrefs.getBoolean(Constants.PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION, false);
+				
+			//boolean useGoogleActivityInFusion=mPrefs.getBoolean(Constants.PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION, false);
 
-			//MST Classifier And Fusion
-			AccelerometerFeature motionStateFeatures=mClassificationManager.mMSTFeatureExtraction.extractWindowFeature(event);
+			/**
+			 * MST Classifier And Fusion
+			 */
+			/*AccelerometerFeature motionStateFeatures=mClassificationManager.mMSTFeatureExtraction.extractWindowFeature(event);
 			if(motionStateFeatures!=null){
 				String motionStateInstance=motionStateFeatures.asStringForMotationState();
 				WekaClassifier motionStateClassifier=mClassificationManager.mClassfiers.get(Constants.ACCEL_MOTION_STATE); 
 				double[] distr=motionStateClassifier.classify(motionStateInstance);
 				Log.e(LOG_TAG, "motion state classifier output is : " +Arrays.toString(distr));
 				
-				/**
+				*//**
 				 * Get the motion state with largest probability
-				 */
+				 *//*
 				int predClassIdx=CommonUtils.idxOfMax(distr);
 				if(predClassIdx!=-1){
 					String predClass=Constants.CLASSIFIER_CLASS[1][predClassIdx];
 					if(!phoneNotStill) predClass="Still";
 					Log.e(LOG_TAG, "cur motion state="+predClass);
 					stateTextView.setText(STATE_PREFIX+predClass);
-					mPastClassifiedMotionStates.add(predClass);
+					mPastClassifiedMotionStates.add(MotionState.translate(predClass));
 				}
 				
 				//early exit based on state
 				if(//!mPastGoogleActivities.containsAtLeastOneWalkingAndOneParking()
-						!mPastClassifiedMotionStates.containsAtLeastOneOnFootAndOneInVehicle()
+						!mPastClassifiedMotionStates.containsAtLeastMOnFootAndAtLeastNInVehicleStates(1,1)
 						) return;
 					
 				if(lastClassifiedMotionStateDistr!=null){
@@ -538,13 +573,13 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 				//lastMotionStateDistr=new double[distr.length];
 				//for(int ii=0;ii<distr.length;ii++) lastMotionStateDistr[ii]=distr[ii];
 				
-			}else{
-				if(//!mPastGoogleActivities.containsAtLeastOneWalkingAndOneParking()
-						!mPastClassifiedMotionStates.containsAtLeastOneOnFootAndOneInVehicle()
-						) 
-					return;
 			}
-
+			else
+				if(//!mPastGoogleActivities.containsAtLeastOneWalkingAndOneParking()
+						!mPastClassifiedMotionStates.containsAtLeastMOnFootAndAtLeastNInVehicleStates(1,1)
+						) 
+					return;*/
+			
 			
 			AccelerometerFeature civFeatures=mClassificationManager.mCIVFeatureExtraction.extractWindowFeature(event);
 			if(civFeatures!=null){
@@ -553,15 +588,12 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 				if( civVector!=null){
 					Log.e(LOG_TAG, acceleometerSeq+" new civ vector is : "+civVector);
 					
-					boolean logAcclFeaturesOn=mPrefs.getBoolean(Constants.LOGGING_ACCL_FEATURES_SWITCH, false);
-					if(logOn&&logAcclFeaturesOn){
-						// log the Change-In-Variance Classifier predicated result
-						mLogManager.log(civVector, Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_ACCEL_FEATURE]);
-					}
+					
 						/**
 						 * calculate the probability of the outcome
 						 */
-						if(!classifierForCIVOn){
+					boolean classifierForCIVOn=mPrefs.getBoolean(Constants.PREFERENCE_KEY_CIV_CLASSIFIER_ON, false);	
+					if(!classifierForCIVOn){
 							HashMap<Integer, ArrayList<Double>> newPeriodicalVector=new HashMap<Integer, ArrayList<Double>>();
 							newPeriodicalVector.put(Constants.INDICATOR_CIV,CommonUtils.stringToDoubleListRemoved(civVector, ",", new int[]{0}) );
 							outcome=mFusionManager.fuse(lastVectors, newPeriodicalVector, System.currentTimeMillis(),Constants.HIGH_LEVEL_ACTIVITY_UPARKING, mLogManager);
@@ -606,38 +638,20 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 			}
 			
 			
-			boolean logDetectionOn=mPrefs.getBoolean(Constants.LOGGING_DETECTION_SWITCH, false);
-			if(//!mPastGoogleActivities.containsAtLeastOneOnFootAndOneInVehicle()
-					!mPastGoogleActivities.containsAtLeastOneOnFoot()
-					) 
-				outcome=Constants.OUTCOME_NONE;
+			//boolean logDetectionOn=mPrefs.getBoolean(Constants.LOGGING_DETECTION_SWITCH, false);
 			
 			switch(outcome){
 			case Constants.OUTCOME_PARKING:
 			case Constants.OUTCOME_UNPARKING:
-				long notiInterval=mPrefs.getInt(Constants.PREFERENCE_KEY_DETECTION_INTERVAL_IN_MILLISEC, Constants.DETECTION_INTERVAL_DEFAULT_VALUE_IN_MILLISEC);
-				long lastSameTypeDetectionTimestamp;
-				if(outcome==Constants.OUTCOME_PARKING) lastSameTypeDetectionTimestamp=lastParkingTimestamp;
-				else lastSameTypeDetectionTimestamp=lastUnparkingTimestamp;
+				//long notificationInterval=mPrefs.getInt(Constants.PREFERENCE_KEY_DETECTION_INTERVAL, Constants.DETECTION_INTERVAL_DEFAULT_VALUE);
+				//long lastSameTypeDetectionTimestamp;
+				//if(outcome==Constants.OUTCOME_PARKING) lastSameTypeDetectionTimestamp=lastParkingTimestamp;
+				//else lastSameTypeDetectionTimestamp=lastUnparkingTimestamp;
 				
-				if(System.currentTimeMillis()-lastSameTypeDetectionTimestamp>notiInterval){
-					if(outcome==Constants.OUTCOME_PARKING) lastParkingTimestamp=System.currentTimeMillis();
-					else lastUnparkingTimestamp=System.currentTimeMillis();
-					/**
-					 * log detection outcome and time
-					 */
-					Toast.makeText(getApplicationContext(), "\ndetected "+CommonUtils.eventCodeToString(outcome)+" at time: "+CommonUtils.formatTimestamp( new Date(), "HH:mm:ss" ), Toast.LENGTH_LONG).show();
+				//if(System.currentTimeMillis()-lastSameTypeDetectionTimestamp>notificationInterval*Constants.ONE_SECOND_IN_MILLISECOND){
+					//if(outcome==Constants.OUTCOME_PARKING) lastParkingTimestamp=System.currentTimeMillis();
+					//else lastUnparkingTimestamp=System.currentTimeMillis();
 					
-					if(logOn){
-						String logMsg="\ndetected "+CommonUtils.eventCodeToString(outcome)+" at time: "+CommonUtils.formatTimestamp( new Date(), "HH:mm:ss" )+"\n";
-						
-						if(mFusionManager.fusionProcessLog.toString().length()>0
-							&&logDetectionOn){
-							logMsg+=mFusionManager.fusionProcessLog.toString()+"\n";
-						}
-						mLogManager.log(logMsg, Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
-							
-					}
 					 /*mXPSHandler.getLocation(null
 					 ,WPSStreetAddressLookup.WPS_FULL_STREET_ADDRESS_LOOKUP
 					 , new XPSLocationCallback(eventCode) );*/
@@ -646,14 +660,15 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	    			.setNumUpdates(1)
 	    			.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY), 
 					new LocationClientListener(outcome));
-				}
+				//}
 				break;
 			case Constants.OUTCOME_NONE:
-				if(logOn){
+				/*if(logOn){
 					if(logDetectionOn){
 						mLogManager.log("outcome="+outcome+"\n"+mFusionManager.fusionProcessLog.toString()+"\n", Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
 					}
-				}
+				}*/
+				break;
 			default:
 				break;
 			}			
@@ -732,6 +747,8 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 			}
 			
 		
+		mTextToSpeech = new TextToSpeech(this, this);
+			
 
         /*
          * Initialize managers
@@ -755,7 +772,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	
 	       
 	        // Get the instance of the customized notification manager
-	        mEventDetectionNotificationManager=EventDetectionNotificationManager.getInstance(this);
+	        mDetectionNotificationManager=DetectionNotificationManager.getInstance(this);
 	        
 	        //Get the FusionManager object
 	        mFusionManager=new FusionManager(this);
@@ -808,7 +825,8 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
  		//Interval 1 seconds.
 		Timer uiTimer = new Timer();
 		mIODectorHandler = new Handler();
-		uiTimer.scheduleAtFixedRate(new TimerTask() {
+		
+		/*uiTimer.scheduleAtFixedRate(new TimerTask() {
 			private int walked = 0;
 			@Override
 			public void run() {
@@ -830,7 +848,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 					}
 				});
 			}
-		}, 0, 1000);
+		}, 0, 1000);*/
 		
 		
 	   /**
@@ -865,33 +883,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
     }
     
     
-    public void showAvailabilityMap() {
-    	//MapFragment mapFragment = (MapFragment)getFragmentManager().findFragmentById(R.id.map);
-        //GoogleMap map = mapFragment.getMap();
-    	//GoogleMap map = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map))
-        //.getMap();
-//        VisibleRegion bounds = map.getProjection().getVisibleRegion();
-//        LatLngBounds xyBounds = bounds.latLngBounds;
-//        String msg = "northest = " + xyBounds.northeast;
-//        CameraUpdate center=
-//            CameraUpdateFactory.newLatLng(new LatLng(41.909348,
-//                		-87.777664));
-//            CameraUpdate zoom=CameraUpdateFactory.zoomTo(15);
-//
-//            mMap.moveCamera(center);
-//            mMap.animateCamera(zoom);        
-
-            
-            for (int i = 0; i < parkingBlocks.size(); i++) {
-            	ParkingBlock parkingBlock = parkingBlocks.elementAt(i);
-            	PolylineOptions line = new PolylineOptions().add(parkingBlock.startLocation, parkingBlock.endLocation)
-            			.width(20).color(parkingBlock.getColorByAvailability());
-            	Polyline polyline = mMap.addPolyline(line);
-            	parkingBlock.display = polyline;
-            	//map.addMarker(new MarkerOptions().position(parkingBlock.meterLocation)
-            		//.title(parkingBlock.meterAddress));
-            }
-    }
+    
     
   /**
    * TODO
@@ -906,7 +898,8 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
   		private double[] normalizedProbablities;
   		private double[] featureValues;
   		
-  		@Override
+  		@SuppressLint({ "UseSparseArrays", "SimpleDateFormat" })
+		@Override
   		protected String doInBackground(String... param) {
   			cellTowerChart.updateProfile();//get the cell info at time = 0
   			for(int i=0;i<10;i++){//get the value for the magnet at the interval of 1s for 10s
@@ -1045,13 +1038,13 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
     
     @Override
     protected void onStart(){
-    	Log.d(LOG_TAG, LOG_TAG+" activity has started");
+    	Log.e(LOG_TAG, LOG_TAG+" activity has started");
     	super.onStart();
     }
     
     @Override
     protected void onPause() {
-    	Log.d(LOG_TAG, LOG_TAG+" activity has paused");
+    	Log.e(LOG_TAG, LOG_TAG+" activity has paused");
         super.onPause();
     	
         // Stop listening to broadcasts when the Activity isn't visible.
@@ -1064,9 +1057,19 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
   
     @Override
     protected void onStop(){
-    	Log.d(LOG_TAG, LOG_TAG+" activity has stopped");
+    	Log.e(LOG_TAG, LOG_TAG+" activity has stopped");
     	super.onStop();
     }
+    
+    
+    @Override
+    protected void onDestroy() {
+/*        if (mTextToSpeech != null) {
+        	mTextToSpeech.stop();
+        	mTextToSpeech.shutdown();
+        }*/
+        super.onDestroy();
+     }
 
     /*
      * Create the menu
@@ -1098,23 +1101,22 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 		final EditText notificationTresholdText=(EditText)dialog.findViewById(R.id.notification_threshold);
 		notificationTresholdText.setText(String.format("%.2f", mPrefs.getFloat(Constants.PREFERENCE_KEY_NOTIFICATION_THRESHOLD, (float)Constants.DEFAULT_DETECTION_THRESHOLD)) );
 		
-		final EditText detectionIntervalText=(EditText)dialog.findViewById(R.id.detection_interval);
-		detectionIntervalText.setText(
-				String.valueOf(mPrefs.getInt(Constants.PREFERENCE_KEY_DETECTION_INTERVAL_IN_MILLISEC, Constants.DETECTION_INTERVAL_DEFAULT_VALUE_IN_MILLISEC) ));
+		//final EditText detectionIntervalText=(EditText)dialog.findViewById(R.id.detection_interval);
+		//detectionIntervalText.setText(String.valueOf(mPrefs.getInt(Constants.PREFERENCE_KEY_DETECTION_INTERVAL, Constants.DETECTION_INTERVAL_DEFAULT_VALUE) ));
 		
 		final EditText googleActivityUpdateIntervalText=(EditText)dialog.findViewById(R.id.google_activity_update_interval);
 		googleActivityUpdateIntervalText.setText(
 				String.valueOf(mPrefs.getInt(Constants.PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL, Constants.GOOGLE_ACTIVITY_UPDATE_INTERVAL_DEFAULT_VALUE))
 				);
 		
-		final ToggleButton useGoogleActivityInFusion=(ToggleButton)dialog.findViewById(R.id.use_google_for_motion_state_in_fusion);
-		useGoogleActivityInFusion.setChecked(mPrefs.getBoolean(Constants.PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION, false));
+		//final ToggleButton useGoogleActivityInFusion=(ToggleButton)dialog.findViewById(R.id.use_google_for_motion_state_in_fusion);
+		//useGoogleActivityInFusion.setChecked(mPrefs.getBoolean(Constants.PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION, false));
 		
 		final ToggleButton logAcclRawButton=(ToggleButton)dialog.findViewById(R.id.log_raw_switch);
 		logAcclRawButton.setChecked(mPrefs.getBoolean(Constants.LOGGING_ACCL_RAW_SWITCH, false));
 		
-		final ToggleButton logAcclFeaturesButton=(ToggleButton)dialog.findViewById(R.id.log_accl_features_switch);
-		logAcclFeaturesButton.setChecked(mPrefs.getBoolean(Constants.LOGGING_ACCL_FEATURES_SWITCH, false));
+		final ToggleButton logGoogleActUpdatesButton=(ToggleButton)dialog.findViewById(R.id.log_google_updates_switch);
+		logGoogleActUpdatesButton.setChecked(mPrefs.getBoolean(Constants.LOGGING_GOOGLE_ACTIVITY_UPDATE, false));
 		
 		final ToggleButton logDetectionButton=(ToggleButton)dialog.findViewById(R.id.log_report_switch);
 		logDetectionButton.setChecked(mPrefs.getBoolean(Constants.LOGGING_DETECTION_SWITCH, false));
@@ -1146,11 +1148,11 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 				else
 					editor.putBoolean(Constants.LOGGING_ACCL_RAW_SWITCH, false);
 
-				if (logAcclFeaturesButton.isChecked())
-					editor.putBoolean(Constants.LOGGING_ACCL_FEATURES_SWITCH,
+				if (logGoogleActUpdatesButton.isChecked())
+					editor.putBoolean(Constants.LOGGING_GOOGLE_ACTIVITY_UPDATE,
 							true);
 				else
-					editor.putBoolean(Constants.LOGGING_ACCL_FEATURES_SWITCH,
+					editor.putBoolean(Constants.LOGGING_GOOGLE_ACTIVITY_UPDATE,
 							false);
 
 				if (logDetectionButton.isChecked())
@@ -1174,20 +1176,21 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 				editor.putFloat(Constants.PREFERENCE_KEY_NOTIFICATION_THRESHOLD, notificationTreshold);
 				
 				
-				int detectionInterval;
+				/*int detectionInterval;
 				try{
 					detectionInterval=Integer.parseInt(
 							detectionIntervalText.getText().toString());
 				}catch(Exception ex){
-					detectionInterval=Constants.DETECTION_INTERVAL_DEFAULT_VALUE_IN_MILLISEC;
+					detectionInterval=Constants.DETECTION_INTERVAL_DEFAULT_VALUE;
 				}
-				editor.putInt(Constants.PREFERENCE_KEY_DETECTION_INTERVAL_IN_MILLISEC, detectionInterval);
+				editor.putInt(Constants.PREFERENCE_KEY_DETECTION_INTERVAL, detectionInterval);*/
 				
 				
-				if (useGoogleActivityInFusion.isChecked())
+				/*if (useGoogleActivityInFusion.isChecked())
 					editor.putBoolean(Constants.PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION, true);
 				else
-					editor.putBoolean(Constants.PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION, false);
+					editor.putBoolean(Constants.PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION, false);*/
+				
 				int googleActivityUpdateInterval;
 				try{
 					googleActivityUpdateInterval=Integer.parseInt(
@@ -1533,56 +1536,101 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
         }
       }
     
-    private void onDetectionConfirmed(int eventCode, Location location, String address){
-    	int resID;
-		String prefix;
-		float markerColor;
-		if(eventCode==Constants.OUTCOME_PARKING){
-			resID=R.raw.vehicle_parked;
-			prefix=Constants.PARKING_NOTIFICATION;
-			markerColor=BitmapDescriptorFactory.HUE_AZURE;
-		}else{//unparking
-			if(!mPastGoogleActivities.containsAtLeastOneInVehicle()){
-				CachedDetection cd=new CachedDetection(CachedDetection.Type.Unparking, location, System.currentTimeMillis(), address);
-				return;
-			}
-			resID=R.raw.vehicle_deparked;
-			prefix=Constants.UNPARKING_NOTIFICATION;
-			markerColor=BitmapDescriptorFactory.HUE_RED;
-		}
-			
-		//String curTimeString=CommonUtils.formatTimestamp(new Date(),formatTemplate);
-		String curTimeString=CommonUtils.formatTimestamp( new Date(location.getTime()), "HH:mm:ss   " );
-		Log.e(LOG_TAG, curTimeString+" \n"+location.toString() );	
-		
-		/*
-		 * actions
-		 */
-		//1. send the text notification
-		String notificationMsg=prefix+" "+curTimeString;
-		if(address!=null) notificationMsg+=address;
-		mEventDetectionNotificationManager.sendTextNotification(notificationMsg);
-					
-		//2. play the sound
-		mEventDetectionNotificationManager.playVoiceNotification(resID);
-		
-		//3. log the address of event
-		String logMsg=prefix+"\nlocatoin retrieval time:"+curTimeString+"\nlocation:"+location.toString()+"\n";
+    
+      
+      
+    // actions taken when a parking/unparking event is detected and the location of the event is retrieved
+	private void onLocationRetrieved(int eventCode, Location location, String address){
+		//latestLocation=getLatestLocationFromIndividualProvider(location);
+		String logMsg=
+				(eventCode==Constants.OUTCOME_PARKING?Constants.PARKING_NOTIFICATION:Constants.UNPARKING_NOTIFICATION)+
+				"\nlocatoin retrieval time:"+CommonUtils.formatTimestamp( new Date(location.getTime()), "HH:mm:ss   " )+"\nlocation:"+location.toString()+"\n";
 		if(address!=null){
 			logMsg+=address+"\n";
 			logMsg+=pastEnvironments.toString()+"\n"
 			+mPastClassifiedMotionStates.toString()+"\n"
 			+mPastGoogleActivities.toString()+"\n";
 		}
-		mLogManager.log(logMsg, Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
+		boolean logDetection=getSharedPreferences(Constants.SHARED_PREFERENCES, 0).getBoolean(Constants.LOGGING_DETECTION_SWITCH, false);
+		if(logDetection)
+			mLogManager.log(logMsg, Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
+				
+		if(eventCode==Constants.OUTCOME_PARKING){//parking
+			if(mPastGoogleActivities.isTransitionTo(MotionState.Type.ON_FOOT)){
+				onDetectionConfirmed(eventCode,System.currentTimeMillis(), location, address);
+			}else{
+				CachedDetection cd=new CachedDetection(CachedDetection.Type.Parking, location, System.currentTimeMillis(), address);
+				mCachedParkingDetectionList.add(cd);
+			}
+		}else{//unparking
+			if(mPastGoogleActivities.isTransitionTo(MotionState.Type.IN_VEHICLE)){
+				onDetectionConfirmed(eventCode, System.currentTimeMillis(), location, address);
+			}else{
+				CachedDetection cd=new CachedDetection(CachedDetection.Type.Unparking, location, System.currentTimeMillis(), address);
+				mCachedUnparkingDetectionList.add(cd);
+			}
+		}
+	}
+	
+	public void onDetectionConfirmed(int eventCode,long eventTimestamp, Location eventlocation, String eventAddress){
+    	int resID;
+		String prefix;
+		float markerColor;
+		String voiceNotificationMsg;
+		if(eventCode==Constants.OUTCOME_PARKING){
+			resID=R.raw.vehicle_parked;
+			prefix=Constants.PARKING_NOTIFICATION;
+			markerColor=BitmapDescriptorFactory.HUE_AZURE;
+			voiceNotificationMsg="Vehicle Parked ";
+		}else{//unparking
+			resID=R.raw.vehicle_deparked;
+			prefix=Constants.UNPARKING_NOTIFICATION;
+			markerColor=BitmapDescriptorFactory.HUE_RED;
+			voiceNotificationMsg="Vehicle Unparked ";
+		}
+			
+		//String curTimeString=CommonUtils.formatTimestamp(new Date(),formatTemplate);
+		String curTimeString=CommonUtils.formatTimestamp( new Date(eventlocation.getTime()), "HH:mm:ss   " );
+		Log.e(LOG_TAG, curTimeString+" \n"+eventlocation.toString() );	
+		
+		/*
+		 * actions
+		 */
+		//1. send the text notification
+		String notificationMsg=prefix+" "+curTimeString;
+		if(eventAddress!=null) notificationMsg+=eventAddress;
+		mDetectionNotificationManager.sendTextNotification(notificationMsg);
+					
+		//2. play the sound
+		//2.1 announce the type
+		//mDetectionNotificationManager.playVoiceNotification(resID);
+		//2.2 announce the time
+		long diffInMillisecs=System.currentTimeMillis()-eventTimestamp;
+		long pastMinutes=diffInMillisecs/Constants.ONE_MINUTE;
+		long pastSeconds=(diffInMillisecs-pastMinutes*Constants.ONE_MINUTE)/Constants.ONE_SECOND_IN_MILLISECOND;
+		if(pastMinutes>0) voiceNotificationMsg+=pastMinutes+" minutes ";
+		voiceNotificationMsg+=pastSeconds+" seconds ago";
+		mTextToSpeech.speak(voiceNotificationMsg, TextToSpeech.QUEUE_FLUSH, null);
+		
+		//3. log the address of event
+		String logMsg=prefix+"\nNotification generation time:"+curTimeString+"\nlocation:"+eventlocation.toString()+"\n";
+		if(eventAddress!=null){
+			logMsg+=eventAddress+"\n";
+			logMsg+=pastEnvironments.toString()+"\n"
+			+mPastClassifiedMotionStates.toString()+"\n"
+			+mPastGoogleActivities.toString()+"\n";
+		}
+		boolean logDetection=getSharedPreferences(Constants.SHARED_PREFERENCES, 0).getBoolean(Constants.LOGGING_DETECTION_SWITCH, false);
+		if(logDetection)
+			mLogManager.log(logMsg, Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
 		
 		//4. show on the map
 		mMap.clear();
-		mEventDetectionNotificationManager.addMarkersToMap(mMap, curTimeString, prefix
-				, location.getLatitude(), location.getLongitude(), location.getAltitude(),	markerColor);
+		mDetectionNotificationManager.addMarkersToMap(mMap, curTimeString, prefix
+				, eventlocation.getLatitude(), eventlocation.getLongitude(), eventlocation.getAltitude(),	markerColor);
 		//center and zoom in the map
 		CameraPosition cameraPosition = new CameraPosition.Builder()
-	    .target(new LatLng(location.getLatitude(), location.getLongitude()) )     // Sets the center of the map to Mountain View
+	    .target(new LatLng(eventlocation.getLatitude(), eventlocation.getLongitude()) )     // Sets the center of the map to Mountain View
 	    .zoom(17)                   // Sets the zoom
 	    //.bearing(90)                // Sets the orientation of the camera to east
 	    //.tilt(30)                   // Sets the tilt of the camera to 30 degrees
@@ -1596,27 +1644,8 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 		//updateAvailabilityDisplay(eventCode, location);
 		//add a marker on the map				
 		Log.e(LOG_TAG, "operations on map completed");
-		updateAvailabilityDisplay(eventCode, location);
+		updateAvailabilityDisplay(eventCode, eventlocation);
     }
-      
-      
-    // actions taken when a parking/unparking event is detected and the location of the event is retrieved
-	private void onLocationRetrieved(int eventCode, Location location, String address){
-		//latestLocation=getLatestLocationFromIndividualProvider(location);
-		if(eventCode==Constants.OUTCOME_PARKING){//parking
-			//TODO 
-			//if(mPastGoogleActivities.lastInVehicleStateExpired()) return;
-			onDetectionConfirmed(eventCode, location, address);
-		}else{//unparking
-			if(!mPastGoogleActivities.containsAtLeastOneInVehicle()){
-				CachedDetection cd=new CachedDetection(CachedDetection.Type.Unparking, location, System.currentTimeMillis(), address);
-				mCachedUnparkingDetectionList.add(cd);
-				return;
-			}else{
-				onDetectionConfirmed(eventCode, location, address);
-			}
-		}
-	}
 	
 	
 	public void updateAvailabilityDisplay(int eventCode, Location location) {
@@ -1669,6 +1698,37 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 //    	    parkingBlock.display = polyline;
 //        }        
 	}
+	
+	public void showAvailabilityMap() {
+    	//MapFragment mapFragment = (MapFragment)getFragmentManager().findFragmentById(R.id.map);
+        //GoogleMap map = mapFragment.getMap();
+    	//GoogleMap map = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map))
+        //.getMap();
+//        VisibleRegion bounds = map.getProjection().getVisibleRegion();
+//        LatLngBounds xyBounds = bounds.latLngBounds;
+//        String msg = "northest = " + xyBounds.northeast;
+//        CameraUpdate center=
+//            CameraUpdateFactory.newLatLng(new LatLng(41.909348,
+//                		-87.777664));
+//            CameraUpdate zoom=CameraUpdateFactory.zoomTo(15);
+//
+//            mMap.moveCamera(center);
+//            mMap.animateCamera(zoom);        
+
+            
+            for (int i = 0; i < parkingBlocks.size(); i++) {
+            	ParkingBlock parkingBlock = parkingBlocks.elementAt(i);
+            	PolylineOptions line = new PolylineOptions().add(parkingBlock.startLocation, parkingBlock.endLocation)
+            			.width(20).color(parkingBlock.getColorByAvailability());
+            	Polyline polyline = mMap.addPolyline(line);
+            	parkingBlock.display = polyline;
+            	//map.addMarker(new MarkerOptions().position(parkingBlock.meterLocation)
+            		//.title(parkingBlock.meterAddress));
+            }
+    }
+	
+	
+	
 
 	@Override
 	public void onConnected(Bundle arg0) {
@@ -1859,65 +1919,53 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
             //updateActivityHistory();
         }
     };
+    
+    
+	@Override
+	//of TextToSpeech
+	public void onInit(int status) {
+		if (status == TextToSpeech.SUCCESS) {
+			// set Language
+			int result = mTextToSpeech.setLanguage(Locale.US);
+			// tts.setPitch(5); // set pitch level
+			// tts.setSpeechRate(2); // set speech speed rate
+			if (result == TextToSpeech.LANG_MISSING_DATA
+				|| result == TextToSpeech.LANG_NOT_SUPPORTED) {
+			}{
+				Log.e(LOG_TAG, "Text-To-Speech Language cannot be setted US. Error code=" + result);
+			}
+		} else {
+			Log.e(LOG_TAG, "Text-To-Speech Initilization Failed");
+		}
+	}
 
 }
 
 
 
-class PastMotionState {
+class PastMotionStates{
 	public int capacity;
 	public Source source;
 	public HashMap<MotionState.Type, Integer> map;
 	public ArrayList<MotionState.Type> list;
 	
 	public long timestampOfLastInVehicleState;
+	public long timestampOfLastOnFootState;
+	public static final long EXPIRATION_TIME_IN_MILLISEC=Constants.ONE_MINUTE+Constants.ONE_MINUTE/2;
 
-	public PastMotionState(Source source, int capacity) {
+	public PastMotionStates(Source source, int capacity) {
 		this.source = source;
 		this.capacity = capacity;
 		map = new HashMap<MotionState.Type, Integer>();
 		list = new ArrayList<MotionState.Type>();
 	}
 
-	public boolean add(String predClass) {
-		boolean ret;
-		if ("Walking".equals(predClass)) {
-			ret=add(MotionState.Type.On_Foot);
-		} else {
-			if ("Driving".equals(predClass))
-				ret=add(MotionState.Type.In_Vehicle);
-			else {
-				if ("Still".equals(predClass))
-					ret=add(MotionState.Type.Still);
-				else
-					ret=add(MotionState.Type.Other);
-			}
-		}
-		return ret;
+	public void clear(){
+		map.clear();
+		list.clear();
 	}
-
-	public boolean add(int activityType) {
-		boolean ret;
-		switch (activityType) {
-		case DetectedActivity.ON_FOOT:
-			ret=add(MotionState.Type.On_Foot);
-			break;
-		case DetectedActivity.IN_VEHICLE:
-			ret=add(MotionState.Type.In_Vehicle);
-			break;
-		case DetectedActivity.STILL:
-			ret=add(MotionState.Type.Still);
-			break;
-		case DetectedActivity.ON_BICYCLE:
-			ret=add(MotionState.Type.ON_BIKE);
-		default:
-			ret=add(MotionState.Type.Unknown);
-			break;		
-		}
-		return ret;
-	}
-
-	public boolean add(MotionState.Type state) {
+	
+	public void add(MotionState.Type state) {
 		if (list.size() == capacity) {
 			MotionState.Type removedMotionType = list.remove(0);// remove the oldest state
 			map.put(removedMotionType, map.get(removedMotionType) - 1);
@@ -1926,53 +1974,51 @@ class PastMotionState {
 		if (!map.containsKey(state))
 			map.put(state, 0);
 		map.put(state, map.get(state) + 1);
-		if(state==MotionState.Type.In_Vehicle){
-			timestampOfLastInVehicleState=System.currentTimeMillis();
-			if(map.get(state)==1){//return true only if the state is the first in_vehicle
-				return true;
-			}
+	}
+	
+	public void removeAll(MotionState.Type state) {
+		while(list.remove(state));
+		map.remove(state);
+	}
+	
+	public boolean isTransitionTo(MotionState.Type toState){
+		if(toState!=MotionState.Type.IN_VEHICLE&&toState!=MotionState.Type.ON_FOOT) return false;
+		boolean ret=containsAtLeastMOnFootAndAtLeastNInVehicleStates(1, 1)&&containsOnlyOneAndIsLaterThanFromState(toState);
+		
+		if(ret){
+    		//remove all previous occurrences of fromState
+			if(toState==MotionState.Type.IN_VEHICLE) removeAll(MotionState.Type.ON_FOOT);
+			else removeAll(MotionState.Type.IN_VEHICLE);
 		}
-		return false;
+		return ret;
 	}
 	
-	public boolean lastInVehicleStateExpired(){
-		if(System.currentTimeMillis()-timestampOfLastInVehicleState>Constants.EXPIRATION_TIME_FOR_GOOGLE_IN_VEHICLE_STATE_IN_MILLISEC) return true;
-		else return false;
-	}
-
-	public boolean containsAtLeastOneOnFootAndOneInVehicle() {
+	public boolean containsAtLeastMOnFootAndAtLeastNInVehicleStates(int mOnFoot, int nInVehicle) {
 		// return false if the filter fails
-		if (!map.containsKey(MotionState.Type.On_Foot)
-				|| !map.containsKey(MotionState.Type.In_Vehicle))
+		if (!map.containsKey(MotionState.Type.ON_FOOT)
+				|| !map.containsKey(MotionState.Type.IN_VEHICLE))
 			return false;
-		int walkingCnt = map.get(MotionState.Type.On_Foot);
-		int drivingCnt = map.get(MotionState.Type.In_Vehicle);
+		int walkingCnt = map.get(MotionState.Type.ON_FOOT);
+		int drivingCnt = map.get(MotionState.Type.IN_VEHICLE);
 		// Log.e(LOG_TAG,"#Walk="+walkingCnt+" #Drive="+drivingCnt);
-		if (walkingCnt < 1 || drivingCnt < 1)
+		if (walkingCnt < mOnFoot  || drivingCnt < nInVehicle)
 			return false;
 		return true;
 	}
 	
-	public boolean containsAtLeastOneOnFoot() {
-		// return false if the filter fails
-		if (!map.containsKey(MotionState.Type.On_Foot))
-			return false;
-		int walkingCnt = map.get(MotionState.Type.On_Foot);
-		if (walkingCnt < 1 )return false;
-		return true;
-	}
-	
-	public boolean containsAtLeastOneInVehicle() {
-		// return false if the filter fails
-		if ( !map.containsKey(MotionState.Type.In_Vehicle))
-			return false;
-		int drivingCnt = map.get(MotionState.Type.In_Vehicle);
-		// Log.e(LOG_TAG,"#Walk="+walkingCnt+" #Drive="+drivingCnt);
-		if (drivingCnt < 1)
-			return false;
-		return true;
-	}
+	//Type equals to either On_foot or In_vehicle
+	public boolean containsOnlyOneAndIsLaterThanFromState(MotionState.Type type) {
+		if (!map.containsKey(type)||map.get(type)!=1) return false;
 
+		for(int i=list.size()-1;i>=0;i--){
+			MotionState.Type curType=list.get(i);
+			if(curType!=MotionState.Type.ON_FOOT&&curType!=MotionState.Type.IN_VEHICLE) continue;
+			if(curType==type) return true;
+			else return false;
+		}
+		return false;		
+	}
+	
 	public String toString() {
 		String ret = list.toString() + "\n";
 		for (Type type : map.keySet())
@@ -1987,8 +2033,8 @@ class MotionState {
 	}
 
 	public enum Type {
-		On_Foot("On_Foot"), In_Vehicle("In_Vehicle"), Still("Still"), Unknown(
-				"Unknown"), ON_BIKE("On_Bike"), Other("Other");
+		ON_FOOT("On_Foot"), IN_VEHICLE("In_Vehicle"), STILL("Still"), UNKNOWN(
+				"Unknown"), ON_BIKE("On_Bike"), OTHER("Other");
 
 		private String typeString;
 
@@ -2004,6 +2050,44 @@ class MotionState {
 	public Source source;
 	public Type type;
 	public int secondOfDay;
+	
+	public static MotionState.Type translate(String predClass) {
+		MotionState.Type ret;
+		if ("Walking".equals(predClass)) {
+			ret=MotionState.Type.ON_FOOT;
+		} else {
+			if ("Driving".equals(predClass))
+				ret=MotionState.Type.IN_VEHICLE;
+			else {
+				if ("Still".equals(predClass))
+					ret=MotionState.Type.STILL;
+				else
+					ret=MotionState.Type.OTHER;
+			}
+		}
+		return ret;
+	}
+
+	public static MotionState.Type translate(int activityTypeDefinedByGoogle) {
+		MotionState.Type ret;
+		switch (activityTypeDefinedByGoogle) {
+		case DetectedActivity.ON_FOOT:
+			ret=MotionState.Type.ON_FOOT;
+			break;
+		case DetectedActivity.IN_VEHICLE:
+			ret=MotionState.Type.IN_VEHICLE;
+			break;
+		case DetectedActivity.STILL:
+			ret=MotionState.Type.STILL;
+			break;
+		case DetectedActivity.ON_BICYCLE:
+			ret=MotionState.Type.ON_BIKE;
+		default:
+			ret=MotionState.Type.UNKNOWN;
+			break;		
+		}
+		return ret;
+	}
 }
 
 class CachedDetection{
@@ -2014,6 +2098,7 @@ class CachedDetection{
 	public Location location;
 	public String address;
 	public Type type;
+	public static final long EXPIRATION_TIME=Constants.ONE_MINUTE;
 	
 	public CachedDetection(Type type, Location loc, long time, String address){
 		timestamp=time;
@@ -2037,7 +2122,7 @@ class CachedDetectionList{
 		int i;
 		ArrayList<CachedDetection> newList=new ArrayList<CachedDetection>();
 		for(i=0;i<list.size();i++){
-			if(curtime-list.get(i).timestamp<=Constants.EXPIRATION_TIME_FOR_GOOGLE_IN_VEHICLE_STATE_IN_MILLISEC){
+			if(curtime-list.get(i).timestamp<=CachedDetection.EXPIRATION_TIME){
 				newList.add(list.get(i));
 			}
 		}
@@ -2052,7 +2137,7 @@ class CachedDetectionList{
 	
 	public CachedDetection get(int index){
 		removeExpiredCachedDetection();
-		if(index>=list.size()) return null;
+		if(index<0||index>=list.size()) return null;
 		return list.get(index);
 	}
 	

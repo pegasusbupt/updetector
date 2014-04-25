@@ -39,7 +39,7 @@ import com.updetector.MainActivity;
 import com.updetector.R;
 import com.updetector.R.drawable;
 import com.updetector.R.string;
-import com.updetector.managers.EventDetectionNotificationManager;
+import com.updetector.managers.DetectionNotificationManager;
 import com.updetector.managers.LocationManagerWrapper;
 import com.updetector.managers.LogManager;
 import com.google.android.gms.location.ActivityRecognitionResult;
@@ -65,7 +65,7 @@ public class ActivityRecognitionIntentService extends IntentService {
     private SharedPreferences mPrefs;
     
     // An instance of the notificaiton manager
-    private EventDetectionNotificationManager mNotificationManagerWrapper;
+    private DetectionNotificationManager mNotificationManagerWrapper;
     
     // The location manager object
     private LocationManagerWrapper mLocationManagerWrapper;
@@ -96,7 +96,7 @@ public class ActivityRecognitionIntentService extends IntentService {
         mDateFormat.applyPattern("yyyy-MM-dd HH:mm:ss:SSS");
         mDateFormat.applyLocalizedPattern(mDateFormat.toLocalizedPattern());
 
-        mNotificationManagerWrapper=EventDetectionNotificationManager.getInstance(this);
+        mNotificationManagerWrapper=DetectionNotificationManager.getInstance(this);
         mLocationManagerWrapper=LocationManagerWrapper.getInstance(this);
         
         // If the intent contains an update

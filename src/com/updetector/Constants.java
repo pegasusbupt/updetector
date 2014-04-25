@@ -412,7 +412,7 @@ public final class Constants {
 	  
 	    public static final int MAX_LOG_SIZE = 100000; //GAME mode: about 37.5*60 records per second
 	    
-	    public static final int DETECTION_INTERVAL_DEFAULT_VALUE_IN_MILLISEC=ONE_SECOND_IN_MILLISECOND*5; //any two parking/unparking activities detection should at least be this apart
+	    public static final int DETECTION_INTERVAL_DEFAULT_VALUE=10; //secs, any two parking/unparking activities detection should at least be this apart
 	    
 	    public static final String PARKING_NOTIFICATION="Parking at";
 	    public static final String UNPARKING_NOTIFICATION="Unparking at";
@@ -452,7 +452,7 @@ public final class Constants {
 	     */
 		public static final String LOGGING_ON="LOG ON";
 		public static final String LOGGING_ACCL_RAW_SWITCH="ACCL RAW";
-		public static final String LOGGING_ACCL_FEATURES_SWITCH="ACCL FEATURES";
+		public static final String LOGGING_GOOGLE_ACTIVITY_UPDATE="GOOGLE ACTIVITY";
 		public static final String LOGGING_ERROR_SWITCH="ERROR REPORT";
 		public static final String LOGGING_DETECTION_SWITCH="DETECTION REPORT";
 		public static final String LOGGING_ENVIRON_SWITCH="ENVIRON REPORT";
@@ -462,7 +462,7 @@ public final class Constants {
 
 	
 		public static final String PREFERENCE_KEY_NOTIFICATION_THRESHOLD="DETECTION THRESHOLD";
-		public static final String PREFERENCE_KEY_DETECTION_INTERVAL_IN_MILLISEC="DETECTION INTERVAL";
+		public static final String PREFERENCE_KEY_DETECTION_INTERVAL="DETECTION INTERVAL";
 		
 	    // Shared Preferences repository name
 		public static final String SHARED_PREFERENCES =DEFAULT_PACKAGE_NAME+".SHARED_PREFERENCES";
@@ -473,13 +473,13 @@ public final class Constants {
 		// variables for different log file type
 		public static final int LOG_TYPE_ERROR_REPORT=0;
 		public static final int LOG_TYPE_ACCEL_RAW=1;
-		public static final int LOG_TYPE_ACCEL_FEATURE=2;
+		public static final int LOG_TYPE_GOOGLE_ACT_UPDATE=2;
 		public static final int LOG_TYPE_ENVIRONMENT=3;
 		public static final int LOG_TYPE_DETECTION_REPORT=4;
 		public static final String[] LOG_FILE_TYPE={
 			"ERROR_REPORT",
 			"ACCELEROMETER_RAW", 
-			"ACCELEROMETER_FEATURE",
+			"GOOGLE_ACTIVITY",
 			"ENVIRONMENT",
 			"DETECTION_REPORTS"};
 		
@@ -504,7 +504,7 @@ public final class Constants {
 		 ******************************/
 //shared preference
 		public static final String PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL="PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL"; 
-		public static final int GOOGLE_ACTIVITY_UPDATE_INTERVAL_DEFAULT_VALUE=5;
+		public static final int GOOGLE_ACTIVITY_UPDATE_INTERVAL_DEFAULT_VALUE=1; //seconds
 		public static final String PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION="PREFERENCE_KEY_GOOGLE_ACTIVITY_IN_FUSION";
 		
 		//communicate btw activity service and main activity 
@@ -516,8 +516,9 @@ public final class Constants {
 		public static final String GOOGLE_ACT_UPDATE_IN_VEHICLE_ACTIVITY_CONFIDENCE="GOOGLE_ACT_UPDATE_IN_VEHICLE_ACTIVITY_CONFIDENCE";
 		
 		//
-		public static final int GOOGLE_ACTIVITY_LAST_STATE_NO=20;
-		public static final long EXPIRATION_TIME_FOR_GOOGLE_IN_VEHICLE_STATE_IN_MILLISEC=ONE_MINUTE;
+		public static final int GOOGLE_ACTIVITY_LAST_STATE_NO=27;
+		
+	
 		
 		/************************************************
 	     * IODetector Related

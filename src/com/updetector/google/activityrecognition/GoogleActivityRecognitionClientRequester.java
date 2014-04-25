@@ -102,11 +102,11 @@ public class GoogleActivityRecognitionClientRequester
          * The PendingIntent sends updates to ActivityRecognitionIntentService
          */
     	final SharedPreferences mPrefs = mContext.getSharedPreferences(Constants.SHARED_PREFERENCES,  Context.MODE_PRIVATE);
-    	long updateInterval=mPrefs.getLong(Constants.PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL, 
+    	int updateInterval=mPrefs.getInt(Constants.PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL, 
     			Constants.GOOGLE_ACTIVITY_UPDATE_INTERVAL_DEFAULT_VALUE);
     	
         getActivityRecognitionClient().requestActivityUpdates(
-                updateInterval,
+                updateInterval*Constants.ONE_SECOND_IN_MILLISECOND,
                 createRequestPendingIntent());
 
         // Disconnect the client
