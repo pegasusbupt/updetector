@@ -414,8 +414,8 @@ public final class Constants {
 	    
 	    public static final int DETECTION_INTERVAL_DEFAULT_VALUE=10; //secs, any two parking/unparking activities detection should at least be this apart
 	    
-	    public static final String PARKING_NOTIFICATION="Parking at";
-	    public static final String UNPARKING_NOTIFICATION="Unparking at";
+	    public static final String PARKING_NOTIFICATION="Parking (request location) at ";
+	    public static final String UNPARKING_NOTIFICATION="Unparking (request location) at ";
 		    /**
 		     * Directory settings
 		     */
@@ -460,6 +460,9 @@ public final class Constants {
 		public static final String PREFERENCE_KEY_CIV_CLASSIFIER_ON="USE CLASSIFIER FOR CIV INDICATOR";
 		public static final String PREFERENCE_KEY_CIV_DELTA_CONDITIONAL_PROBABILITY="DELTA FOR CONDITIONAL PROBABILITY";
 
+		public static final String PREFERENCE_KEY_LOG_FILE_DATE="PREFERENCE_KEY_LOG_FILE_SEQ_DATE";
+		public static final String PREFERENCE_KEY_LOG_FILE_SEQ_NUMBER="PREFERENCE_KEY_LOG_FILE_SEQ_NUMBER";
+		
 	
 		public static final String PREFERENCE_KEY_NOTIFICATION_THRESHOLD="DETECTION THRESHOLD";
 		public static final String PREFERENCE_KEY_DETECTION_INTERVAL="DETECTION INTERVAL";

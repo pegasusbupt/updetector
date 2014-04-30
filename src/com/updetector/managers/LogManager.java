@@ -16,6 +16,7 @@
 
 package com.updetector.managers;
 
+import android.R.integer;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
@@ -82,41 +83,34 @@ public class LogManager {
         // Open the shared preferences repository
         mPrefs = context.getSharedPreferences(Constants.SHARED_PREFERENCES,
                 Context.MODE_PRIVATE);
+        Editor editor = mPrefs.edit();
+        
+        
+        // Create a timestamp
+        String dateString = new SimpleDateFormat("yyyy_MM_dd", Locale.US).format(new Date());
+        String savedDate=mPrefs.getString(Constants.PREFERENCE_KEY_LOG_FILE_DATE, dateString);
+        int dateCompare=dateString.compareTo(savedDate);
+        if(dateCompare>0){//a new day
+        	editor.putString(Constants.PREFERENCE_KEY_LOG_FILE_DATE, dateString);
+        	editor.putInt(Constants.PREFERENCE_KEY_LOG_FILE_SEQ_NUMBER, 0);
+        }else{
+        	if(dateCompare==0){//same day
+        		editor.putInt(Constants.PREFERENCE_KEY_LOG_FILE_SEQ_NUMBER, mPrefs.getInt(Constants.PREFERENCE_KEY_LOG_FILE_SEQ_NUMBER, 0)+1);
+        	}
+        }
+        editor.commit();
 
+        int fileSeq=mPrefs.getInt(Constants.PREFERENCE_KEY_LOG_FILE_SEQ_NUMBER,0);
+        
         // for each type of log, initialize the file
         for(String logFileType: Constants.LOG_FILE_TYPE){
-        	
-        	// If this is a new log file type, set the file number to 1
-            if (!mPrefs.contains(logFileType)) {
-                mLogFileSequenceNumber.put(logFileType,  1);
-            // Otherwise, get the last-used file number and increment it.
-            } else {
-                int fileNum = mPrefs.getInt(logFileType, 0);
-                mLogFileSequenceNumber.put(logFileType,  mLogFileSequenceNumber.get(logFileType) + 1);
-            }
-
-            // Get a repository editor sLogFileInstance
-            Editor editor = mPrefs.edit();
-
-            // Put the file number in the repository
-            editor.putInt(logFileType+Constants.PREFERENCE_KEY_TYPE[0], mLogFileSequenceNumber.get(logFileType));
-
-            // Create a timestamp
-            String dateString = new SimpleDateFormat("yyyy_MM_dd", Locale.US).format(new Date());
-
-            // Create the file name by sprintf'ing its parts into the filename string.
+        	// Create the file name by sprintf'ing its parts into the filename string.
             mFileName = context.getString(
                     R.string.log_filename, // a match pattern
                     logFileType+"_",
                     dateString,
-                    mLogFileSequenceNumber.get(logFileType),
+                    fileSeq,
                     ".log");
-            
-            // Save the filename
-            editor.putString(logFileType+Constants.PREFERENCE_KEY_TYPE[1], mFileName);
-            editor.commit();
-
-            // Commit the updates
             // Create the log file
             mLogFiles.put(logFileType, createLogFile(mFileName) );
         }

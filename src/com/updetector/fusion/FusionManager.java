@@ -49,10 +49,10 @@ public class FusionManager {
   	 * 		 Integer: indicator ID
   	 * 	     Double:  scalars;
   	 * @param timestamp: in milliseconds 
-  	 * @return
+  	 * @return most outcome type and its probability
   	 */
   	//TODO fusion method
-  	public int fuse(HashMap<Integer, ArrayList<Double>> lastVectors, 
+  	public double[] fuse(HashMap<Integer, ArrayList<Double>> lastVectors, 
   			HashMap<Integer, ArrayList<Double>> updates, long timestamp, int highLevelActivity, LogManager mLogManager){
   		/**
   		 * first update the lastIndicators by first removing stale values 
@@ -160,14 +160,14 @@ public class FusionManager {
 	  	fusionProcessLog.append("After Normalization: "+Arrays.toString(outcomeLikelihood)+"\n");
   		
 	  	if(logOn&&logDetectionOn&&mLogManager!=null){
-				//mLogManager.log(fusionProcessLog.toString(), Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
+	  		mLogManager.log(fusionProcessLog.toString(), Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
 		}
   		
   		return outcomeLikelihood;
   	}
 	
 	
-	public int generateOutcomeNotification(double[] outcomeLikelihood){
+	public double[] generateOutcomeNotification(double[] outcomeLikelihood){
   		int[] outcomes={Constants.OUTCOME_NONE, Constants.OUTCOME_PARKING, Constants.OUTCOME_UNPARKING};
   		boolean probabilistic=false;
   		
@@ -177,10 +177,10 @@ public class FusionManager {
   		if(probabilistic){
   	  		Random rand=new Random();
   	  		double randNum=rand.nextDouble();
-  	  		if(randNum<outcomeLikelihood[0]) return outcomes[0];
+  	  		if(randNum<outcomeLikelihood[0]) return new double[]{outcomes[0], outcomeLikelihood[0]};
   	  		else{
-  	  			if(randNum>=1-outcomeLikelihood[2]) return outcomes[2];
-  	  			else return outcomes[1];
+  	  			if(randNum>=1-outcomeLikelihood[2]) return new double[]{outcomes[2], outcomeLikelihood[2]};
+  	  			else return new double[]{outcomes[1],outcomeLikelihood[1]};
   	  		}
   		}
   		
@@ -199,9 +199,10 @@ public class FusionManager {
   		double detectionThreshold=mPrefs.getFloat(Constants.PREFERENCE_KEY_NOTIFICATION_THRESHOLD, (float)Constants.DEFAULT_DETECTION_THRESHOLD);
   		/* if the outcome is parking/unparking it must exceed certain threshold*/
   		if((ret==Constants.OUTCOME_PARKING&&maxLikelihood<detectionThreshold)
-  				&&(ret==Constants.OUTCOME_UNPARKING&&maxLikelihood<detectionThreshold-0.1)){
+  			||
+  			(ret==Constants.OUTCOME_UNPARKING&&maxLikelihood<detectionThreshold-0.1)){
   			ret=Constants.OUTCOME_NONE; 
   		}
-  		return ret;  		
+  		return new double[]{ret, maxLikelihood};  		
   	}
 }
