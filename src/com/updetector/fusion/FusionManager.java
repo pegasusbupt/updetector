@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Random;
 
+
 import android.R.integer;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -16,6 +17,7 @@ import android.util.Log;
 
 import com.updetector.Constants;
 import com.updetector.managers.LogManager;
+
 
 public class FusionManager {
 	Context context;
@@ -90,6 +92,19 @@ public class FusionManager {
   	}
   	
   	
+  	public static double[] mostLikelyOutcome(double[] outcomeLikelihood){
+		int mostLikelyOutcome=0;
+		double maxProb=outcomeLikelihood[mostLikelyOutcome];
+		for(int i=1;i<outcomeLikelihood.length;i++){
+			if(outcomeLikelihood[i]>=maxProb){
+				mostLikelyOutcome=i;
+				maxProb=outcomeLikelihood[i];
+			}
+		}
+		return new double[]{mostLikelyOutcome, maxProb};
+	}
+  	
+  	
   	/**
   	 * 
   	 * @param outcomes
@@ -101,18 +116,56 @@ public class FusionManager {
   	public double[] BayesianFusion(int[] outcomes, HashMap<Integer, ArrayList<Double>> vectorsToBeFused, int highLevelActivity, LogManager mLogManager){
   		
   		double[] outcomeLikelihood=new double[outcomes.length]; 
-  		double curProb;  		
   		
   		fusionProcessLog.delete(0, fusionProcessLog.length());
   		fusionProcessLog.append(new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date())+"\n");
   		  		
-  		for(int i=0;i<outcomes.length;i++){
+  		/**
+  		 * fusion only when CIV and MST indicates the same outcome
+  		 */
+  		int[] indicators={Constants.INDICATOR_CIV, Constants.INDICATOR_MST};
+		
+  		
+  		double[] condProbs=new double[outcomeLikelihood.length];
+  		int[] mostLikelyOutcomes=new int[vectorsToBeFused.size()];//most likely outcome for each indicator
+  		int indicatorCnt=0;
+  		for(int indiDix=0;indiDix<indicators.length;indiDix++){
+			int indicator=indicators[indiDix];
+			if(vectorsToBeFused.containsKey(indicator)){
+				for (int i = 0; i < outcomes.length; i++) {
+					int outcome = outcomes[i];
+					ArrayList<Double> timestampedVector=vectorsToBeFused.get(indicator);
+					double[] features=new double[timestampedVector.size()-1];
+					for(int k=0;k<features.length;k++) features[k]=timestampedVector.get(k+1);
+					condProbs[i]=ConditionalProbability.conditionalProbabilityProduct(features, outcome, indicator, Constants.HIGH_LEVEL_ACTIVITY_UPARKING, fusionProcessLog);
+					mostLikelyOutcomes[indicatorCnt]=(int)mostLikelyOutcome(condProbs)[0];
+					
+					if(indicatorCnt==0) outcomeLikelihood[i]=1;//initialize
+					if(//true
+						indicatorCnt==0 || mostLikelyOutcomes[indicatorCnt]==mostLikelyOutcomes[indicatorCnt-1]
+					){
+						outcomeLikelihood[i] *= condProbs[i]; // precision is 3
+					}
+				}
+				indicatorCnt++;
+			}
+		}
+		
+		//multiply prior prob
+		for (int i = 0; i < outcomes.length; i++) {
+			outcomeLikelihood[i] *= Constants.PRIOR_PROBABILITY.get(outcomes[i]);
+		}
+  		
+  		
+  		
+  		/*for(int i=0;i<outcomes.length;i++){
   			int outcome=outcomes[i];
   			curProb=Constants.PRIOR_PROBABILITY.get(outcome);
   			//Log.d(LOG_TAG,"curProb="+curProb);
   			for(Integer indicatorID: vectorsToBeFused.keySet()){
   				Log.e(LOG_TAG,"vector is "+vectorsToBeFused.get(indicatorID));
   				for(int featureIdx=1;featureIdx<vectorsToBeFused.get(indicatorID).size();featureIdx++){
+  					
   					HashSet<Integer> notUsedFeatureIdx=Constants.NOT_USED_FEATURES_IDX.get(indicatorID);
   					if(notUsedFeatureIdx!=null&&notUsedFeatureIdx.contains(featureIdx-1)) continue;
   					
@@ -123,7 +176,7 @@ public class FusionManager {
   						ConditionalProbability cp=Constants.CONDITIONAL_PROBABILITY.get(identifier);
   						
   						double featureCondProb;  						
-  						/*double normalizedFeatureValue;  						
+  						double normalizedFeatureValue;  						
   						if(featureValue>=cp.lowerBound&&featureValue<=cp.upperBound){
   							normalizedFeatureValue= ((int)((featureValue-cp.lowerBound)/(cp.upperBound-cp.lowerBound)*1000))/1000.0;
   							featureCondProb=cp.getProb(normalizedFeatureValue );
@@ -131,7 +184,7 @@ public class FusionManager {
   						}else{
   							normalizedFeatureValue=-1;
   							featureCondProb=0.01;
-  						}*/
+  						}
   						double delta=ConditionalProbability.getDelta(cp, highLevelActivity);
   						featureCondProb=cp.getProbNormalDistr(featureValue, delta);
  						curProb*=featureCondProb;
@@ -144,7 +197,7 @@ public class FusionManager {
   				}
   			}
   			outcomeLikelihood[i]=curProb; //precision is 3
-  		}  		
+  		}  	*/	
   		
   		
   		/**
@@ -200,7 +253,7 @@ public class FusionManager {
   		/* if the outcome is parking/unparking it must exceed certain threshold*/
   		if((ret==Constants.OUTCOME_PARKING&&maxLikelihood<detectionThreshold)
   			||
-  			(ret==Constants.OUTCOME_UNPARKING&&maxLikelihood<detectionThreshold-0.1)){
+  			(ret==Constants.OUTCOME_UNPARKING&&maxLikelihood<detectionThreshold)){
   			ret=Constants.OUTCOME_NONE; 
   		}
   		return new double[]{ret, maxLikelihood};  		

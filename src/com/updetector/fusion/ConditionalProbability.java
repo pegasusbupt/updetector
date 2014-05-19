@@ -1,10 +1,10 @@
 package com.updetector.fusion;
 
+import java.util.HashSet;
 import org.apache.commons.math3.distribution.NormalDistribution;
-
 import com.updetector.Constants;
 
-import android.R.integer;
+
 
 public class ConditionalProbability {
 	public int outcomeID;
@@ -102,6 +102,35 @@ public class ConditionalProbability {
 		//System.out.println(identifier+" "+interval/5);
 		//return 0.1;
 		return Math.max(interval/20, 0.1);
+	}
+	
+	/**
+	 * 
+	 * @param features: features of a vector
+	 * @param outcome
+	 * @param indicator
+	 * @param highLevelActivity
+	 * @return
+	 */
+	public static double conditionalProbabilityProduct(double[] features, int outcome, int indicator, int highLevelActivity, StringBuilder fusionLog){
+		double ret=1;
+		for(int featureIdx=0;featureIdx<features.length;featureIdx++){
+			HashSet<Integer> notUsedFeatureIdx=Constants.NOT_USED_FEATURES_IDX.get(indicator);
+			if(notUsedFeatureIdx!=null&&notUsedFeatureIdx.contains(featureIdx)) continue;
+		
+			String identifier=outcome+"-"+indicator+"-"+featureIdx;
+			
+			if(Constants.CONDITIONAL_PROBABILITY.containsKey(identifier)){
+				double featureValue=features[featureIdx];
+				ConditionalProbability cp=Constants.CONDITIONAL_PROBABILITY.get(identifier);
+				double delta=ConditionalProbability.getDelta(cp, highLevelActivity);
+				double featureCondProb=cp.getProbNormalDistr(featureValue, delta);
+				ret*=featureCondProb;
+				String logMsg=identifier+" "+featureValue+" "+delta+" "+featureCondProb+" "+ret;
+				fusionLog.append(logMsg+"\n");
+			}
+		}
+		return ret;
 	}
 	
 }

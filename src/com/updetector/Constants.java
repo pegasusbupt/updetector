@@ -130,7 +130,7 @@ public final class Constants {
 	public static HashMap<Integer, HashSet<Integer>> NOT_USED_FEATURES_IDX;
 		
 		
-	public static double DEFAULT_DETECTION_THRESHOLD=0.8;
+	public static double DEFAULT_DETECTION_THRESHOLD=0.6;
 	static {
   		/**
   		 * Parking/Unparking likelihoods
@@ -414,8 +414,8 @@ public final class Constants {
 	    
 	    public static final int DETECTION_INTERVAL_DEFAULT_VALUE=10; //secs, any two parking/unparking activities detection should at least be this apart
 	    
-	    public static final String PARKING_NOTIFICATION="Parking (request location) at ";
-	    public static final String UNPARKING_NOTIFICATION="Unparking (request location) at ";
+	    public static final String PARKING_NOTIFICATION="Parking detected (request location) at ";
+	    public static final String UNPARKING_NOTIFICATION="Unparking detected (request location) at ";
 		    /**
 		     * Directory settings
 		     */
@@ -519,7 +519,7 @@ public final class Constants {
 		public static final String GOOGLE_ACT_UPDATE_IN_VEHICLE_ACTIVITY_CONFIDENCE="GOOGLE_ACT_UPDATE_IN_VEHICLE_ACTIVITY_CONFIDENCE";
 		
 		//
-		public static final int GOOGLE_ACTIVITY_LAST_STATE_NO=27;
+		public static final int GOOGLE_ACTIVITY_LAST_STATE_NO=13;
 		
 	
 		
@@ -548,7 +548,7 @@ public final class Constants {
 			public static final String[] CLASSIFIER_FILTER_OPTION={"-R 1,4,5,9,10", "", ""};			
 			public static final String[][] CLASSIFIER_CLASS={
 				{"n", "p", "u"}
-				,{"Driving", "Walking" , "Sitting" , "Standing", "Still"}
+				,{"Driving", "Walking" , "Jogging" , "Upstairs" , "Downstairs" , "Sitting" , "Standing", "Still"}
 				,{"on", "off", "openclose", "open", "close", "bus"}
 			};			
 			public static final int[][] CLASSIFIER_EVENT={

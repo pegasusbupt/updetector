@@ -75,7 +75,7 @@ public class AccelerometerFeature {
 		StringBuilder sb=new StringBuilder();
 		//output the time 
 		//not convient to handld string in weka, so use integer
-		sb.append(CommonUtils.stringTimeToInt(fields[0])+",");
+		sb.append(CommonUtils.HMSToSecs(fields[0])+",");
 		
 		//output the variance difference of x axis
 		double varianceDiff=Double.parseDouble(fields[2])-Double.parseDouble(fields[1]);
@@ -114,7 +114,7 @@ public class AccelerometerFeature {
 		if(this==null) return null;
 		
 		StringBuilder sb=new StringBuilder();
-		sb.append(CommonUtils.intTimeToString(timeIndex)+" ");
+		sb.append(CommonUtils.secsToHMS(timeIndex)+" ");
 		
 		//determining which axises to output
 		int[] outputAxis={0, 1, 2, 3};

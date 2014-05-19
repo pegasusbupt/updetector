@@ -46,11 +46,13 @@ public class CommonUtils {
 	 **************************************/
 	public static int idxOfMax(double[] values){
 		int ret=-1;
-		double max=Double.MIN_VALUE;
-		for(int i=0;i<values.length;i++){
-			if(values[i]>max){
-				max=values[i];
-				ret=i;
+		if(values!=null){
+			double max=0;
+			for(int i=0;i<values.length;i++){
+				if(values[i]>=max){
+					max=values[i];
+					ret=i;
+				}
 			}
 		}
 		return ret;
@@ -135,14 +137,14 @@ public class CommonUtils {
 		return ret;
 	}
 	
-	public static int stringTimeToInt(String time){
+	public static int HMSToSecs(String time){
 		String[] fields=time.split(":");
 		int secs=Integer.parseInt(fields[0])*3600+Integer.parseInt(fields[1])*60;
 		if (fields.length>2) secs+=Integer.parseInt(fields[2]);
 		return secs;
 	}
 	
-	public static String intTimeToString(int secs){
+	public static String secsToHMS(int secs){
 		StringBuilder  sb=new StringBuilder();
 		int[] hourMinSec=new int[3];
 		hourMinSec[0]=secs/3600;

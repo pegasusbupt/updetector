@@ -37,6 +37,8 @@ import java.util.Vector;
 
 import org.apache.commons.math3.analysis.function.Constant;
 
+import weka.core.converters.DatabaseConnection;
+
 import android.R.integer;
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -89,6 +91,7 @@ import com.google.android.gms.common.GooglePlayServicesClient.ConnectionCallback
 import com.google.android.gms.common.GooglePlayServicesClient.OnConnectionFailedListener;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.internal.br;
+import com.google.android.gms.internal.l;
 import com.google.android.gms.location.DetectedActivity;
 import com.google.android.gms.location.LocationClient;
 import com.google.android.gms.location.LocationListener;
@@ -119,6 +122,7 @@ import com.updetector.fusion.FusionManager;
 import com.updetector.google.activityrecognition.GoogleActivityRecognitionClientRemover;
 import com.updetector.google.activityrecognition.GoogleActivityRecognitionClientRequester;
 import com.updetector.indicator.accelerometerbased.AccelerometerFeature;
+import com.updetector.indicator.accelerometerbased.AccelerometerFeatureExtraction.Config;
 import com.updetector.indicator.iodetector.CellTowerChart;
 import com.updetector.indicator.iodetector.DetectionProfile;
 import com.updetector.indicator.iodetector.LightChart;
@@ -132,6 +136,7 @@ import com.updetector.viewadapters.MarkerInfoWindowAdapter;
 import com.updetector.blocksmap.ParkingBlock;
 import com.updetector.blocksmap.ParkingBlocks;
 import com.updetector.bluetooth.BluetoothConnectionService;
+
 
 /**
  * Sample application that demonstrates the use of
@@ -157,7 +162,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
     // Holds the text view  
     private TextView consoleTextView, environTextView, stateTextView, googleStateTextView;
     public static final String ENVIRONMENT_PREFIX="Environment : ";
-    public static final String STATE_PREFIX="Motion State Classified : ";
+    public static final String STATE_PREFIX="Time: "; //"Motion State Classified : ";
     public static final String GOOGLE_MOBILITY_STATE_PREFIX="Motion State Google : ";
     public static final String INDICATOR_PREFIX="Indicator : "; 
    
@@ -176,6 +181,8 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
     
     //Instance of a Bluetooth adapter
     private BluetoothAdapter mBluetoothAdapter;
+
+    private Calendar mCalendar;
 
     /**
      *  Intent filter for incoming broadcasts from the
@@ -230,6 +237,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
      */
     private long lastParkingTimestamp=-1;
     private long lastUnparkingTimestamp=-1;
+    private String timeOfLastGoogleOnFootorInVehicleState="";
     
     /**
      * IODetector fields
@@ -266,19 +274,21 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	public class LocationClientListener implements LocationListener{
 		int eventCode;
 		double detectionConfidence;
-		long requestTimestamp;
+		long detectionTimestamp;
+		int detectionTimeDelayInSec;
 		
-		public LocationClientListener(int eventCode, double confidence, long timestamp){
+		public LocationClientListener(int eventCode, double confidence, long detectionTimestamp, int detectionTImeDelayInSec){
 			this.eventCode=eventCode;	
 			this.detectionConfidence=confidence;
-			this.requestTimestamp=timestamp;
+			this.detectionTimestamp=detectionTimestamp;
+			this.detectionTimeDelayInSec=detectionTImeDelayInSec;
 		}
 	
 
 		@Override
 		public void onLocationChanged(Location location) {
 //			new GetAddressTask(eventCode, requestTimestamp,detectionConfidence).execute(location);
-			onLocationRetrieved(eventCode, detectionConfidence, requestTimestamp, location, null);
+			onLocationRetrieved(eventCode, detectionConfidence, detectionTimestamp, detectionTimeDelayInSec, location, null);
 		}
 	}
 	
@@ -290,17 +300,20 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	 */
 	private class GetAddressTask extends AsyncTask<Location, Void, String> {
 		int eventCode;
-		long locationRequestTimestamp;
+		long detectionTimestamp;
 		double detectionConfidence;
+		int detectionTimeDelayInSecs;
+		
 		long locationRetrievedTimestamp;//addressRequestTimestamp;
 		Location mLocation;
 		
 		
-		public GetAddressTask(int eventCode, long locationRequestTimestamp, double confidence) {
+		public GetAddressTask(int eventCode, long detectionTimestamp, int detectionTimeDelayInSecs ,  double confidence) {
 			super();
 			this.eventCode=eventCode;	
 			this.detectionConfidence=confidence;
-			this.locationRequestTimestamp=locationRequestTimestamp;
+			this.detectionTimestamp=detectionTimestamp;
+			this.detectionTimeDelayInSecs=detectionTimeDelayInSecs;
 			this.locationRetrievedTimestamp=System.currentTimeMillis();
 		}
 
@@ -376,7 +389,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
         @Override
         protected void onPostExecute(String address) {
         	// Display the results of the lookup.
-        	onLocationRetrieved(eventCode, detectionConfidence,locationRequestTimestamp, mLocation, address);
+        	onLocationRetrieved(eventCode, detectionConfidence,detectionTimestamp, detectionTimeDelayInSecs, mLocation, address);
         }
 	} 
 		
@@ -402,7 +415,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	        	
 	        	mLocationClient.requestLocationUpdates( LocationRequest
 	    				.create().setNumUpdates(1).setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY), 
-	    				new LocationClientListener(eventCode, 1.0, System.currentTimeMillis())); 
+	    				new LocationClientListener(eventCode, 1.0, System.currentTimeMillis(), 0) ); 
 	        	
 	        }else{
 	        	//TODO return from Google activity update
@@ -423,32 +436,55 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	        				}
 	        		}
 	        		MotionState.Type activityType=MotionState.translate(mostLikelyActivityType);
-	        		mPastGoogleActivities.add(activityType);
+	        		mPastGoogleActivities.add(new MotionState(Source.Google, activityType, 
+	        				CommonUtils.formatTimestamp(new Date(System.currentTimeMillis()), "HH:mm:ss")
+	        				) );
 	        			
 	        		if(activityType==MotionState.Type.IN_VEHICLE
 	        	||activityType==MotionState.Type.ON_FOOT){
 	        			int outcome;
-	        			CachedDetection NotExpiredCachedDetectionWithLargestConfidence=null;
+	        			
+	        			CachedDetection NotExpiredCachedDetectionWithLargestConfidence,	firstNotExpiredCachedDetection, lastNotExpiredCachedDetection;
+	        			CachedDetectionList cdl=null;
+	        			
+	        			CachedDetection selectedNotExpiredCachedDetection=null;	        			
 	        			if(activityType==MotionState.Type.IN_VEHICLE){
 	        				outcome=Constants.OUTCOME_UNPARKING;
-	        				NotExpiredCachedDetectionWithLargestConfidence=mCachedUnparkingDetectionList.getWithLargestProbability();
+	        				cdl=mCachedUnparkingDetectionList;	        				
 	        			}else{
 	        				outcome=Constants.OUTCOME_PARKING;
-	        				NotExpiredCachedDetectionWithLargestConfidence=mCachedParkingDetectionList.getWithLargestProbability();
+	        				cdl=mCachedParkingDetectionList;	    
 	        			}
+	        			NotExpiredCachedDetectionWithLargestConfidence=cdl.getWithLargestProbability();
+        				firstNotExpiredCachedDetection=cdl.get(0);
+        				lastNotExpiredCachedDetection=cdl.get(cdl.list.size()-1);
+        				selectedNotExpiredCachedDetection=lastNotExpiredCachedDetection;
+	        			
 		        
-		        		if(mPastGoogleActivities.isTransitionTo(activityType)){
-		        				if(NotExpiredCachedDetectionWithLargestConfidence!=null){
-		        						onDetectionConfirmed(outcome,
-			        					 NotExpiredCachedDetectionWithLargestConfidence.timestamp,
-			        					 NotExpiredCachedDetectionWithLargestConfidence.location,
-			        					 NotExpiredCachedDetectionWithLargestConfidence.address);
-		        				}else{//no earlier cached result, request a new location
-		        					mLocationClient.requestLocationUpdates( 
-		        			    			LocationRequest.create()
-		        			    			.setNumUpdates(1)
-		        			    			.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY), 
-		        							new LocationClientListener(outcome, 1.0, System.currentTimeMillis()));
+	        			int secsSinceLastFromState=mPastGoogleActivities.isTransitionTo(activityType);
+		        		long curTime=System.currentTimeMillis();
+		        		long detectedByG=curTime-secsSinceLastFromState*Constants.ONE_SECOND_IN_MILLISECOND;
+	        			if(secsSinceLastFromState!=-1){
+		        				if(selectedNotExpiredCachedDetection!=null){
+		        					Config civExtractionConf=mClassificationManager.mCIVFeatureExtraction.conf;
+		        					long detectionDelayInSecs=civExtractionConf.slidingStep*civExtractionConf.scope/2;
+		        					
+		        					onDetectionConfirmed(outcome,
+		        							
+		        							selectedNotExpiredCachedDetection.timestamp,
+		        							
+		        							selectedNotExpiredCachedDetection.location,
+		        							selectedNotExpiredCachedDetection.address,
+			        					 detectionDelayInSecs
+			        					 );
+		        				}else{
+		        					//no earlier cached result, request a new location
+//		        					mLocationClient.requestLocationUpdates( 
+//		        			    			LocationRequest.create()
+//		        			    			.setNumUpdates(1)
+//		        			    			.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY), 
+//		        							new LocationClientListener(outcome, 1.0, curTime, secsSinceLastFromState));
+//		        				
 		        				}
 		        		}
 
@@ -549,27 +585,35 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 			
 				
 			//boolean useGoogleActivityInFusion=mPrefs.getBoolean(Constants.PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION, false);
-
+			double[] mostLikelyOutcomeAndItsProbability;
+			
+			
 			/**
 			 * MST Classifier And Fusion
 			 */
-			/*AccelerometerFeature motionStateFeatures=mClassificationManager.mMSTFeatureExtraction.extractWindowFeature(event);
-			if(motionStateFeatures!=null){
-				String motionStateInstance=motionStateFeatures.asStringForMotationState();
+			AccelerometerFeature accelWindowForMotionState=mClassificationManager.mMSTFeatureExtraction.extractWindowFeature(event);
+			if(accelWindowForMotionState!=null){
+				String motionStateInstance=accelWindowForMotionState.asStringForMotationState();
 				WekaClassifier motionStateClassifier=mClassificationManager.mClassfiers.get(Constants.ACCEL_MOTION_STATE); 
 				double[] distr=motionStateClassifier.classify(motionStateInstance);
 				Log.e(LOG_TAG, "motion state classifier output is : " +Arrays.toString(distr));
 				
-				*//**
+				/**
 				 * Get the motion state with largest probability
-				 *//*
+				 */
 				int predClassIdx=CommonUtils.idxOfMax(distr);
 				if(predClassIdx!=-1){
 					String predClass=Constants.CLASSIFIER_CLASS[1][predClassIdx];
-					if(!phoneNotStill) predClass="Still";
+					//if(!phoneNotStill) predClass="Still";
 					Log.e(LOG_TAG, "cur motion state="+predClass);
-					stateTextView.setText(STATE_PREFIX+predClass);
-					mPastClassifiedMotionStates.add(MotionState.translate(predClass));
+					//stateTextView.setText(STATE_PREFIX+predClass);
+					mPastClassifiedMotionStates.add(
+							new MotionState(Source.Classifier,MotionState.translate(predClass),
+									CommonUtils.formatTimestamp(new Date(System.currentTimeMillis()), "HH:mm:ss")
+							)
+					);
+					
+					
 				}
 				
 				//early exit based on state
@@ -587,24 +631,23 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 					Log.e(LOG_TAG, acceleometerSeq+" new mst vector is :"+mstVector.toString());					
 					HashMap<Integer, ArrayList<Double>> newPeriodicalVector=new HashMap<Integer, ArrayList<Double>>();
 					newPeriodicalVector.put(Constants.INDICATOR_MST, mstVector);
-					outcome=mFusionManager.fuse(lastVectors, newPeriodicalVector, System.currentTimeMillis(), Constants.HIGH_LEVEL_ACTIVITY_UPARKING, mLogManager);
+					mostLikelyOutcomeAndItsProbability=mFusionManager.fuse(lastVectors, newPeriodicalVector, System.currentTimeMillis(), Constants.HIGH_LEVEL_ACTIVITY_UPARKING, mLogManager);
+					mostLikelyOutcome=(int)mostLikelyOutcomeAndItsProbability[0];
+					mostLikelyOutcomeProb=mostLikelyOutcomeAndItsProbability[1];
 				}
 				lastClassifiedMotionStateDistr=distr;
 				//lastMotionStateDistr=new double[distr.length];
 				//for(int ii=0;ii<distr.length;ii++) lastMotionStateDistr[ii]=distr[ii];
 				
 			}
-			else
-				if(//!mPastGoogleActivities.containsAtLeastOneWalkingAndOneParking()
-						!mPastClassifiedMotionStates.containsAtLeastMOnFootAndAtLeastNInVehicleStates(1,1)
-						) 
-					return;*/
 			
 			
-			AccelerometerFeature civFeatures=mClassificationManager.mCIVFeatureExtraction.extractWindowFeature(event);
-			if(civFeatures!=null){
+			AccelerometerFeature accelWindowForCIV;
+			//accelWindowForCIV=accelWindowForMotionState;
+			accelWindowForCIV=mClassificationManager.mCIVFeatureExtraction.extractWindowFeature(event);
+			if(accelWindowForCIV!=null){
 				//get the vector of the Change-In-Variance features 
-				String civVector=mClassificationManager.mCIVFeatureExtraction.extractCIVVector(civFeatures, civVectorsWithinScope);
+				String civVector=mClassificationManager.mCIVFeatureExtraction.extractCIVVector(accelWindowForCIV, civVectorsWithinScope);
 				if( civVector!=null){
 					Log.e(LOG_TAG, "accelerometerSeq="+acceleometerSeq+" new civ vector is : "+civVector);
 					
@@ -616,9 +659,9 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 					if(!classifierForCIVOn){
 							HashMap<Integer, ArrayList<Double>> newPeriodicalVector=new HashMap<Integer, ArrayList<Double>>();
 							newPeriodicalVector.put(Constants.INDICATOR_CIV,CommonUtils.stringToDoubleListRemoved(civVector, ",", new int[]{0}) );
-							double[] res=mFusionManager.fuse(lastVectors, newPeriodicalVector, System.currentTimeMillis(),Constants.HIGH_LEVEL_ACTIVITY_UPARKING, mLogManager);
-							mostLikelyOutcome=(int)res[0];
-							mostLikelyOutcomeProb=res[1];
+							mostLikelyOutcomeAndItsProbability=mFusionManager.fuse(lastVectors, newPeriodicalVector, System.currentTimeMillis(),Constants.HIGH_LEVEL_ACTIVITY_UPARKING, mLogManager);
+							mostLikelyOutcome=(int)mostLikelyOutcomeAndItsProbability[0];
+							mostLikelyOutcomeProb=mostLikelyOutcomeAndItsProbability[1];
 						}
 						/**
 						 * classify the vector of the Change-In-Variance vectors
@@ -655,7 +698,6 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 								break;
 							}	
 							Log.e(LOG_TAG, "predClass="+predClass);
-							
 						}
 				}
 			}
@@ -678,11 +720,15 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 					 /*mXPSHandler.getLocation(null
 					 ,WPSStreetAddressLookup.WPS_FULL_STREET_ADDRESS_LOOKUP
 					 , new XPSLocationCallback(eventCode) );*/
-					mLocationClient.requestLocationUpdates( 
+				Config civExtractionConf=mClassificationManager.mCIVFeatureExtraction.conf;
+				int detectionDelayInSecs=civExtractionConf.slidingStep*civExtractionConf.scope/2;	
+				
+				mLocationClient.requestLocationUpdates( 
 	    			LocationRequest.create()
 	    			.setNumUpdates(1)
 	    			.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY), 
-					new LocationClientListener(mostLikelyOutcome, mostLikelyOutcomeProb, System.currentTimeMillis())
+					new LocationClientListener(mostLikelyOutcome, mostLikelyOutcomeProb, System.currentTimeMillis()
+							,detectionDelayInSecs)
 	    			);
 				//}
 				break;
@@ -750,7 +796,9 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 			environTextView=(TextView) findViewById(R.id.environment);
 			environTextView.setText(ENVIRONMENT_PREFIX+CommonUtils.eventCodeToString(lastEnvironment));
 			stateTextView=(TextView) findViewById(R.id.state);
-			stateTextView.setText(STATE_PREFIX+"unknown");
+			
+			//stateTextView.setText(STATE_PREFIX+"unknown");
+			
 			googleStateTextView=(TextView) findViewById(R.id.google_state);
 			googleStateTextView.setText(GOOGLE_MOBILITY_STATE_PREFIX+"unknown");
 			
@@ -772,7 +820,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 			
 		
 		mTextToSpeech = new TextToSpeech(this, this);
-			
+		mCalendar=Calendar.getInstance();
 
         /*
          * Initialize managers
@@ -804,9 +852,8 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 	        // Get the ClassificationManager object
 	        mClassificationManager=ClassificationManager.getInstance(this);
 	        
-	        // train the classification models
+	        //TODO  train classifiers if necessary
 	        if(Constants.IS_TRAINING_MODE){
-	        	//TODO  train classifiers if necessary
 	        	int[] classifiersToBeTrained={Constants.ACCEL_MOTION_STATE};	
 	        	for(int classifier: classifiersToBeTrained){
 	        		mClassificationManager.mClassfiers.get(classifier).train();
@@ -1565,11 +1612,13 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
       
     // actions taken when a parking/unparking event is detected and the location of the event is retrieved
 	private void onLocationRetrieved(int eventCode, double detectionConfidence,
-			long locationRequestTimestamp, Location location, String address){
+			long detectionTimestamp, int detectionTimeDelayInSecs,  
+			Location location, String address){
 		boolean logDetection=getSharedPreferences(Constants.SHARED_PREFERENCES, 0).getBoolean(Constants.LOGGING_DETECTION_SWITCH, false);
 		if(logDetection){
 			String logMsg=
-					(eventCode==Constants.OUTCOME_PARKING?Constants.PARKING_NOTIFICATION:Constants.UNPARKING_NOTIFICATION)+CommonUtils.formatTimestamp( new Date(locationRequestTimestamp), "HH:mm:ss   " )
+					(eventCode==Constants.OUTCOME_PARKING?Constants.PARKING_NOTIFICATION:Constants.UNPARKING_NOTIFICATION)+CommonUtils.formatTimestamp( new Date(detectionTimestamp), "HH:mm:ss   " )
+					+"\ndetection confidence is "+detectionConfidence
 					+"\nlocatoin retrieval time:"+CommonUtils.formatTimestamp( new Date(location.getTime()), "HH:mm:ss  " )+"\nlocation:"+location.toString()+"\n";
 				
 				if(address!=null){
@@ -1582,26 +1631,39 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 					+mPastGoogleActivities.toString()+"\n";
 			mLogManager.log(logMsg, Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
 		}
-
+		
+		int secsSinceLastFromState;
+		
 		if(eventCode==Constants.OUTCOME_PARKING){//parking
-			if(detectionConfidence==1.0||mPastGoogleActivities.isTransitionTo(MotionState.Type.ON_FOOT)){
-				onDetectionConfirmed(eventCode, locationRequestTimestamp, location, address);
+			secsSinceLastFromState=mPastGoogleActivities.isTransitionTo(MotionState.Type.ON_FOOT);
+			if(detectionConfidence==1.0||secsSinceLastFromState!=-1){
+		
+				onDetectionConfirmed(eventCode, detectionTimestamp, location, address, detectionTimeDelayInSecs);
 			}else{
-				CachedDetection cd=new CachedDetection(CachedDetection.Type.Parking, location,locationRequestTimestamp, address, detectionConfidence);
+				CachedDetection cd=new CachedDetection(CachedDetection.Type.Parking, location,detectionTimestamp, address, detectionConfidence);
 				mCachedParkingDetectionList.add(cd);
 			}
 		}else{//unparking
-			if(detectionConfidence==1.0||mPastGoogleActivities.isTransitionTo(MotionState.Type.IN_VEHICLE)){
-				onDetectionConfirmed(eventCode, locationRequestTimestamp, location, address);
+			secsSinceLastFromState=mPastGoogleActivities.isTransitionTo(MotionState.Type.IN_VEHICLE);
+			if(detectionConfidence==1.0||secsSinceLastFromState!=-1){
+				onDetectionConfirmed(eventCode, detectionTimestamp, location, address, detectionTimeDelayInSecs);
 			}else{
-				CachedDetection cd=new CachedDetection(CachedDetection.Type.Unparking, location,locationRequestTimestamp, address, detectionConfidence);
+				CachedDetection cd=new CachedDetection(CachedDetection.Type.Unparking, location,detectionTimestamp, address, detectionConfidence);
 				mCachedUnparkingDetectionList.add(cd);
 			}
 		}
 	}
 	
-	public void onDetectionConfirmed(int eventCode,long eventTimestamp, Location eventlocation, String eventAddress){
-    	int resID;
+	
+	public void onDetectionConfirmed(int eventCode,long eventDetectionTimestamp, Location eventlocation, String eventAddress
+			,long detectionDelayInSecs){
+    	MotionState lastOnFootOrInVehicleState=mPastGoogleActivities.lastOnFootOrInVehicleState();
+    	if(lastOnFootOrInVehicleState!=null&&lastOnFootOrInVehicleState.timeInHMS.equals(timeOfLastGoogleOnFootorInVehicleState)){
+    		return;
+    	}
+    	timeOfLastGoogleOnFootorInVehicleState=lastOnFootOrInVehicleState.timeInHMS;
+		
+		int resID;
 		String prefix;
 		float markerColor;
 		String voiceNotificationMsg;
@@ -1619,7 +1681,7 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 
 		//String curTimeString=CommonUtils.formatTimestamp(new Date(),formatTemplate);
 		long curTimestamp=System.currentTimeMillis();
-		String curTimeString=CommonUtils.formatTimestamp( new Date(curTimestamp), "HH:mm:ss   " );
+		String curTimeString=CommonUtils.formatTimestamp( new Date(curTimestamp), "HH:mm:ss" );
 		Log.e(LOG_TAG, curTimeString+" \n"+eventlocation.toString() );	
 		
 		/*
@@ -1634,23 +1696,39 @@ public class MainActivity extends FragmentActivity implements ConnectionCallback
 		//2.1 announce the type
 		//mDetectionNotificationManager.playVoiceNotification(resID);
 		//2.2 announce the time
-		long diffInMillisecs=curTimestamp-eventTimestamp;
-		long pastMinutes=diffInMillisecs/Constants.ONE_MINUTE;
-		long pastSeconds=(diffInMillisecs-pastMinutes*Constants.ONE_MINUTE)/Constants.ONE_SECOND_IN_MILLISECOND;
-		if(pastMinutes>0) voiceNotificationMsg+=pastMinutes+" minutes ";
-		voiceNotificationMsg+=pastSeconds+" seconds ago";
+		if(detectionDelayInSecs>0)
+		{			
+			//voice the event time
+			long diffInMillisecs=curTimestamp-(eventDetectionTimestamp- detectionDelayInSecs*Constants.ONE_SECOND_IN_MILLISECOND );
+			long pastMinutes=diffInMillisecs/Constants.ONE_MINUTE;
+			long pastSeconds=(diffInMillisecs-pastMinutes*Constants.ONE_MINUTE)/Constants.ONE_SECOND_IN_MILLISECOND;			
+			voiceNotificationMsg+=" about ";
+			if(pastMinutes>0) voiceNotificationMsg+=pastMinutes+" minutes ";
+			voiceNotificationMsg+=pastSeconds+" seconds ago";
+			
+			//voice the detection time
+			diffInMillisecs-=detectionDelayInSecs*Constants.ONE_SECOND_IN_MILLISECOND;
+			pastMinutes=diffInMillisecs/Constants.ONE_MINUTE;
+			pastSeconds=(diffInMillisecs-pastMinutes*Constants.ONE_MINUTE)/Constants.ONE_SECOND_IN_MILLISECOND;
+			voiceNotificationMsg+=" detected ";
+			if(pastMinutes>0) voiceNotificationMsg+=pastMinutes+" minutes ";
+			voiceNotificationMsg+=pastSeconds+" seconds ago";			
+ 		}
+		
 		mTextToSpeech.speak(voiceNotificationMsg, TextToSpeech.QUEUE_FLUSH, null);
 		
 		//3. log the address of event
-		String logMsg=prefix+CommonUtils.formatTimestamp(new Date(eventTimestamp), "HH:mm:ss ")
+		String logMsg=prefix+CommonUtils.formatTimestamp(new Date(eventDetectionTimestamp), "HH:mm:ss ")
 				+"\nNotification generation time:"+curTimeString
-				+"\nCached Detection timestamp: "+CommonUtils.formatTimestamp(new Date(eventTimestamp), "HH:mm:ss ")
+				+"\nDetection timestamp: "+CommonUtils.formatTimestamp(new Date(eventDetectionTimestamp), "HH:mm:ss ")
+				+"\nDetection delay: "+detectionDelayInSecs+" secs"
 				+"\nlocation:"+eventlocation.toString()+"\n";
 		if(eventAddress!=null) logMsg+=eventAddress+"\n";
 		else logMsg+="address is not available. \n";
 		logMsg+=pastEnvironments.toString()+"\n"
 				+mPastClassifiedMotionStates.toString()+"\n"
-				+mPastGoogleActivities.toString()+"\n";
+				+mPastGoogleActivities.toString()+"\n"
+				+"timeOfLastGoogleOnFootorInVehicleState="+timeOfLastGoogleOnFootorInVehicleState+"\n";
 		boolean logDetection=getSharedPreferences(Constants.SHARED_PREFERENCES, 0).getBoolean(Constants.LOGGING_DETECTION_SWITCH, false);
 		if(logDetection)
 			mLogManager.log(logMsg, Constants.LOG_FILE_TYPE[Constants.LOG_TYPE_DETECTION_REPORT]);
@@ -1979,7 +2057,7 @@ class PastMotionStates{
 	public int capacity;
 	public Source source;
 	public HashMap<MotionState.Type, Integer> map;
-	public ArrayList<MotionState.Type> list;
+	public ArrayList<MotionState> list;
 	
 	public long timestampOfLastInVehicleState;
 	public long timestampOfLastOnFootState;
@@ -1989,7 +2067,7 @@ class PastMotionStates{
 		this.source = source;
 		this.capacity = capacity;
 		map = new HashMap<MotionState.Type, Integer>();
-		list = new ArrayList<MotionState.Type>();
+		list = new ArrayList<MotionState>();
 	}
 
 	public void clear(){
@@ -1997,32 +2075,110 @@ class PastMotionStates{
 		list.clear();
 	}
 	
-	public void add(MotionState.Type state) {
+	public void add(MotionState state) {
 		if (list.size() == capacity) {
-			MotionState.Type removedMotionType = list.remove(0);// remove the oldest state
-			map.put(removedMotionType, map.get(removedMotionType) - 1);
+			MotionState removedMotionState = list.remove(0);// remove the oldest state
+			map.put(removedMotionState.type, map.get(removedMotionState.type) - 1);
 		}
 		list.add(state);
-		if (!map.containsKey(state))
-			map.put(state, 0);
-		map.put(state, map.get(state) + 1);
+		Type stateType=state.type;
+		if (!map.containsKey(stateType))
+			map.put(stateType, 0);
+		map.put(stateType, map.get(stateType) + 1);
 	}
 	
-	public void removeAll(MotionState.Type state) {
-		while(list.remove(state));
-		map.remove(state);
-	}
-	
-	public boolean isTransitionTo(MotionState.Type toState){
-		if(toState!=MotionState.Type.IN_VEHICLE&&toState!=MotionState.Type.ON_FOOT) return false;
-		boolean isTransiting=containsAtLeastMOnFootAndAtLeastNInVehicleStates(1, 1)&&containsOnlyOneAndIsLaterThanFromState(toState);
-		
-		if(isTransiting){
-    		//remove all previous occurrences of fromState
-			if(toState==MotionState.Type.IN_VEHICLE) removeAll(MotionState.Type.ON_FOOT);
-			else removeAll(MotionState.Type.IN_VEHICLE);
+	public void removeAll(MotionState.Type stateType) {
+		ArrayList<MotionState> toBeRemovedStates=new ArrayList<MotionState>();
+		for(int i=0;i<list.size();i++){
+			MotionState ms=list.get(i);
+			if(ms.type==stateType)
+				toBeRemovedStates.add(ms);
 		}
-		return isTransiting;
+		for(MotionState ms: toBeRemovedStates){
+			list.remove(ms);		
+		}
+		map.remove(stateType);
+	}
+	
+	/**
+	 * 
+	 * @param toState
+	 * @return secs elapsed since the state that is right after the last fromState
+	 */
+	public int isTransitionTo(MotionState.Type toState){
+		int secsElapsedSinceFromState=-1;
+		if(toState!=Type.IN_VEHICLE&&toState!=Type.ON_FOOT) return secsElapsedSinceFromState;
+		
+		Type fromState=Type.OTHER;
+		int noOfFromStateToBeSeen=1;
+		switch(toState){
+		case ON_FOOT:
+			fromState=Type.IN_VEHICLE; //from state is in_vehicle (at least 2)
+			noOfFromStateToBeSeen++;
+			break;
+		case IN_VEHICLE:
+			fromState=Type.ON_FOOT;
+			noOfFromStateToBeSeen++;
+			//mOnFoot++; //from state is on_foot (at least 2)
+			break;
+		default:
+			break;
+		}
+		
+		boolean seenToStateYet=false;
+		int fromStateCnt=0;
+		int secOfFirstToState=-1, secOfLastFromState=0;
+		MotionState prev=null;
+		for(int i=list.size()-1;i>=0;i--){
+			MotionState cur=list.get(i);
+			if(cur.type==fromState || cur.type==toState){
+				if(cur.type==fromState){
+					if(seenToStateYet==false) break; //not seen toState yet, not transiting
+					else{
+						fromStateCnt++;
+						if(fromStateCnt==1){
+							if(prev!=null) secOfLastFromState=CommonUtils.HMSToSecs(prev.timeInHMS);
+							else secOfLastFromState=CommonUtils.HMSToSecs(cur.timeInHMS);
+						}
+						if(fromStateCnt==noOfFromStateToBeSeen){
+							secsElapsedSinceFromState=secOfFirstToState-secOfLastFromState;
+							break;
+						}
+					}
+				}
+				if(cur.type==toState){
+					if(seenToStateYet==false){ 
+						seenToStateYet=true;
+						secOfFirstToState=CommonUtils.HMSToSecs(cur.timeInHMS);
+					}else{
+						break; //already has seen a toState or has not seen enough no of fromStates (i.e. not transiting)
+					}
+				}
+			}
+			prev=cur;
+		}
+		
+		
+/*		int mOnFoot=1, nInVehicle=1;
+		if(containsAtLeastMOnFootAndAtLeastNInVehicleStates(mOnFoot, nInVehicle)){
+			secsElapsedSinceFromState=containsOnlyOneAndIsLaterThanFromState(toState);
+			if(secsElapsedSinceFromState!=-1){
+				//remove all previous occurrences of fromState
+				if(toState==MotionState.Type.IN_VEHICLE) removeAll(MotionState.Type.ON_FOOT);
+				else removeAll(MotionState.Type.IN_VEHICLE);
+			}
+		}
+*/		
+		return secsElapsedSinceFromState;
+	}
+	
+	public MotionState lastOnFootOrInVehicleState(){
+		for(int i=list.size()-1;i>=0;i--){
+			MotionState cur=list.get(i);
+			if(cur.type!=Type.ON_FOOT&&cur.type!=Type.IN_VEHICLE) continue;
+			return cur;
+		}
+		return null;
 	}
 	
 	public boolean containsAtLeastMOnFootAndAtLeastNInVehicleStates(int mOnFoot, int nInVehicle) {
@@ -2038,17 +2194,29 @@ class PastMotionStates{
 		return true;
 	}
 	
-	//Type equals to either On_foot or In_vehicle
-	public boolean containsOnlyOneAndIsLaterThanFromState(MotionState.Type type) {
-		if (!map.containsKey(type)||map.get(type)!=1) return false;
-
-		for(int i=list.size()-1;i>=0;i--){
-			MotionState.Type curType=list.get(i);
-			if(curType!=MotionState.Type.ON_FOOT&&curType!=MotionState.Type.IN_VEHICLE) continue;
-			if(curType==type) return true;
-			else return false;
+	/**
+	 * 
+	 * @param typeOfToState
+	 * @return elapsed secs since last from state
+	 */
+	public int containsOnlyOneAndIsLaterThanFromState(MotionState.Type typeOfToState) {
+		int secsElapsedSinceFromState=-1;
+		if (!map.containsKey(typeOfToState)||map.get(typeOfToState)!=1) return secsElapsedSinceFromState;
+		
+		MotionState  toState=null; 
+		for(int i=list.size()-1;i>=0;i--){//from the last state
+			MotionState cur=list.get(i);
+			if(cur.type!=MotionState.Type.ON_FOOT&&cur.type!=MotionState.Type.IN_VEHICLE) continue;
+			if(cur.type==typeOfToState){
+				toState=cur;
+			}else{
+				if(toState!=null){
+					secsElapsedSinceFromState=CommonUtils.HMSToSecs(toState.timeInHMS)-CommonUtils.HMSToSecs(cur.timeInHMS);
+				}
+				break;
+			}
 		}
-		return false;		
+		return secsElapsedSinceFromState;		
 	}
 	
 	public String toString() {
@@ -2060,6 +2228,8 @@ class PastMotionStates{
 }
 
 class MotionState {
+	
+	
 	public enum Source {
 		Google, Classifier;
 	}
@@ -2081,7 +2251,13 @@ class MotionState {
 
 	public Source source;
 	public Type type;
-	public int secondOfDay;
+	public String timeInHMS;
+	
+	public MotionState(Source source, Type type, String timeInHMS){
+		this.source=source;
+		this.type=type;
+		this.timeInHMS=timeInHMS;
+	}
 	
 	public static MotionState.Type translate(String predClass) {
 		MotionState.Type ret;
@@ -2119,6 +2295,10 @@ class MotionState {
 			break;		
 		}
 		return ret;
+	}
+	
+	public String toString(){
+		return timeInHMS+"-"+type;
 	}
 }
 

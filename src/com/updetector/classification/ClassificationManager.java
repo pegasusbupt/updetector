@@ -35,7 +35,7 @@ public class ClassificationManager {
 		
 		//TODO parameters to be adjusted
 		mCIVFeatureExtraction=new AccelerometerFeatureExtraction(new Config(10, 3)); //CIV
-		mMSTFeatureExtraction=new AccelerometerFeatureExtraction(new Config(5, 5));	 //MST
+		mMSTFeatureExtraction=new AccelerometerFeatureExtraction(new Config(10, 3)); //MST
 		
 		int n=Constants.CLASSIFIER_NAME.length;
 		int classifierName;

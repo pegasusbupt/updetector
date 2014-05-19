@@ -96,7 +96,7 @@ public class AccelerometerFeatureExtraction {
 		AccelerometerFeature newFeature=null;
 		if(record!=null){
 			String[] fields=record.split(" ");
-			int curTime=CommonUtils.stringTimeToInt(fields[1]);	
+			int curTime=CommonUtils.HMSToSecs(fields[1]);	
 			newFeature=slideWindow(window, curTime, features, fields);			
 		}
 		
