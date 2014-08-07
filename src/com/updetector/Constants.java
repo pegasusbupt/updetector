@@ -130,7 +130,7 @@ public final class Constants {
 	public static HashMap<Integer, HashSet<Integer>> NOT_USED_FEATURES_IDX;
 		
 		
-	public static double DEFAULT_DETECTION_THRESHOLD=0.6;
+	public static double DEFAULT_DETECTION_THRESHOLD=0.5;
 	static {
   		/**
   		 * Parking/Unparking likelihoods
@@ -503,11 +503,14 @@ public final class Constants {
 		
 		
 		/********************************
-		 * Google Activity Recognition Related
+		 * Google Activity Recognition R
+		 * elated
 		 ******************************/
-//shared preference
+		
+		public static final double CONFIDENCE_TRHSHOLD_FOR_STATE_MODIFICATION=25;		
+		//shared preference
 		public static final String PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL="PREFERENCE_KEY_GOOGLE_ACTIVITY_UPDATE_INTERVAL"; 
-		public static final int GOOGLE_ACTIVITY_UPDATE_INTERVAL_DEFAULT_VALUE=1; //seconds
+		public static final int GOOGLE_ACTIVITY_UPDATE_INTERVAL_DEFAULT_VALUE=0; //seconds
 		public static final String PREFERENCE_KEY_USE_GOOGLE_ACTIVITY_IN_FUSION="PREFERENCE_KEY_GOOGLE_ACTIVITY_IN_FUSION";
 		
 		//communicate btw activity service and main activity 
