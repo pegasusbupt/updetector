@@ -1,0 +1,15 @@
+@relation accelerometer
+
+@attribute time numeric
+@attribute averageOfVariDiffOfPrecedingWindows numeric
+@attribute varianceOfVariDiffOfPrecedingWindows numeric
+@attribute averageOfAverageOfPrecedingWindows numeric
+@attribute varianceOfAverageOfPrecedingWindows numeric
+@attribute variDiffOfCurWindow numeric
+@attribute averageOfVariDiffOfSucceedingWindows numeric
+@attribute varianceOfVariDiffOfSucceedingWindows numeric
+@attribute averageOfAverageOfSucceedingWindows numeric
+@attribute varianceOfAverageOfSucceedingWindows numeric
+@attribute class {n,p,u}
+
+@data

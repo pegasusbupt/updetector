@@ -1,0 +1,81 @@
+@relation jAudio
+@ATTRIBUTE "Spectral Centroid Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Spectral Rolloff Point Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Spectral Flux Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Compactness Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Spectral Variability Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Root Mean Square Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Fraction Of Low Energy Windows Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Zero Crossings Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Strongest Beat Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Beat Sum Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Strength Of Strongest Beat Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation1" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation2" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation3" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation4" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation5" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation6" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation7" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation8" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation9" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation10" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation11" NUMERIC
+@ATTRIBUTE "MFCC Overall Standard Deviation12" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation1" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation2" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation3" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation4" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation5" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation6" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation7" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation8" NUMERIC
+@ATTRIBUTE "LPC Overall Standard Deviation9" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Standard Deviation0" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Standard Deviation1" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Standard Deviation2" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Standard Deviation3" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Standard Deviation4" NUMERIC
+@ATTRIBUTE "Spectral Centroid Overall Average0" NUMERIC
+@ATTRIBUTE "Spectral Rolloff Point Overall Average0" NUMERIC
+@ATTRIBUTE "Spectral Flux Overall Average0" NUMERIC
+@ATTRIBUTE "Compactness Overall Average0" NUMERIC
+@ATTRIBUTE "Spectral Variability Overall Average0" NUMERIC
+@ATTRIBUTE "Root Mean Square Overall Average0" NUMERIC
+@ATTRIBUTE "Fraction Of Low Energy Windows Overall Average0" NUMERIC
+@ATTRIBUTE "Zero Crossings Overall Average0" NUMERIC
+@ATTRIBUTE "Strongest Beat Overall Average0" NUMERIC
+@ATTRIBUTE "Beat Sum Overall Average0" NUMERIC
+@ATTRIBUTE "Strength Of Strongest Beat Overall Average0" NUMERIC
+@ATTRIBUTE "MFCC Overall Average0" NUMERIC
+@ATTRIBUTE "MFCC Overall Average1" NUMERIC
+@ATTRIBUTE "MFCC Overall Average2" NUMERIC
+@ATTRIBUTE "MFCC Overall Average3" NUMERIC
+@ATTRIBUTE "MFCC Overall Average4" NUMERIC
+@ATTRIBUTE "MFCC Overall Average5" NUMERIC
+@ATTRIBUTE "MFCC Overall Average6" NUMERIC
+@ATTRIBUTE "MFCC Overall Average7" NUMERIC
+@ATTRIBUTE "MFCC Overall Average8" NUMERIC
+@ATTRIBUTE "MFCC Overall Average9" NUMERIC
+@ATTRIBUTE "MFCC Overall Average10" NUMERIC
+@ATTRIBUTE "MFCC Overall Average11" NUMERIC
+@ATTRIBUTE "MFCC Overall Average12" NUMERIC
+@ATTRIBUTE "LPC Overall Average0" NUMERIC
+@ATTRIBUTE "LPC Overall Average1" NUMERIC
+@ATTRIBUTE "LPC Overall Average2" NUMERIC
+@ATTRIBUTE "LPC Overall Average3" NUMERIC
+@ATTRIBUTE "LPC Overall Average4" NUMERIC
+@ATTRIBUTE "LPC Overall Average5" NUMERIC
+@ATTRIBUTE "LPC Overall Average6" NUMERIC
+@ATTRIBUTE "LPC Overall Average7" NUMERIC
+@ATTRIBUTE "LPC Overall Average8" NUMERIC
+@ATTRIBUTE "LPC Overall Average9" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Average0" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Average1" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Average2" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Average3" NUMERIC
+@ATTRIBUTE "Method of Moments Overall Average4" NUMERIC
+@attribute class {on,off, openclose, open, close, bus}
+@DATA

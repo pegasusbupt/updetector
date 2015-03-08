@@ -1,13 +1,13 @@
 /data
 /data_bak
 /bin
-/res
+# /res
 /gen
 /assets
 /exp
 /libs
 
-/AndroidManifest.xml
+# /AndroidManifest.xml
 /dev_log.docx
 /ic_launcher-web.png
 /Learning_Notes.txt

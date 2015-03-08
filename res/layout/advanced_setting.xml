@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:background="#101010"
+    android:padding="10dip" >
+
+    <ScrollView
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content" >
+
+        <TableLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:stretchColumns="0,1" >
+
+            <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/CIV_classifier_switch"
+                    android:textSize="25sp" >
+                </TextView>
+
+                <ToggleButton
+                    android:id="@+id/civ_classifier_on"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right" >
+                </ToggleButton>
+            </TableRow>
+
+            <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/is_outdoor"
+                    android:textSize="25sp" >
+                </TextView>
+
+                <ToggleButton
+                    android:id="@+id/is_outdoor"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right" >
+                </ToggleButton>
+            </TableRow>
+
+            <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:id="@+id/textView1"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/detection_threshold"
+                    android:textSize="25sp" >
+                </TextView>
+
+                <EditText
+                    android:id="@+id/notification_threshold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/detection_threshold_hint" >
+
+                    <requestFocus />
+                </EditText>
+            </TableRow>
+
+            <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:id="@+id/textView2"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/Google_activity_update_interval"
+                    android:textSize="16sp" >
+                </TextView>
+
+                <EditText
+                    android:id="@+id/google_activity_update_interval"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/Google_activity_update_interval_hint" >
+
+                    <requestFocus />
+                </EditText>
+            </TableRow>
+            
+            <!-- <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mobility_state_method"
+                    android:textSize="16sp" >
+                </TextView>
+
+                <ToggleButton
+                    android:id="@+id/use_google_for_motion_state_in_fusion"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right" >
+                </ToggleButton>
+            </TableRow> -->
+            
+
+           <!--  <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:id="@+id/textview1"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/detection_interval"
+                    android:textSize="20sp" >
+                </TextView>
+
+                <EditText
+                    android:id="@+id/detection_interval"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/detection_interval_hint" >
+
+                    <requestFocus />
+                </EditText>
+            </TableRow> -->
+
+            <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/log_error_switch"
+                    android:textSize="25sp" >
+                </TextView>
+
+                <ToggleButton
+                    android:id="@+id/log_error_switch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right" >
+                </ToggleButton>
+            </TableRow>
+
+            <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/log_accl_raw_switch"
+                    android:textSize="25sp" >
+                </TextView>
+
+                <ToggleButton
+                    android:id="@+id/log_raw_switch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right" >
+                </ToggleButton>
+            </TableRow>
+
+            <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/log_report_switch"
+                    android:textSize="25sp" >
+                </TextView>
+
+                <ToggleButton
+                    android:id="@+id/log_report_switch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right" >
+                </ToggleButton>
+            </TableRow>
+
+            <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/log_google_updates_switch"
+                    android:textSize="25sp" >
+                </TextView>
+
+                <ToggleButton
+                    android:id="@+id/log_google_updates_switch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right" >
+                </ToggleButton>
+            </TableRow>
+
+            <!--
+            <TableRow android:layout_width="fill_parent" 
+			    android:layout_height="wrap_content">
+			    <EditText android:id="@+id/normal_dist_delta" android:layout_width="fill_parent"
+			        android:layout_height="fill_parent" android:hint="@string/delta_hint"></EditText>
+			</TableRow>
+            -->
+
+            <TableRow
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <Button
+                    android:id="@+id/peformance_cancel_button"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/cancel" >
+                </Button>
+
+                <Button
+                    android:id="@+id/performance_apply_button"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/apply" >
+                </Button>
+            </TableRow>
+        </TableLayout>
+    </ScrollView>
+
+</RelativeLayout>

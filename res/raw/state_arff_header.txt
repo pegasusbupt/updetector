@@ -1,0 +1,27 @@
+@relation activity_recognition_labeled
+
+@attribute "X0" numeric
+@attribute "X1" numeric
+@attribute "X2" numeric
+@attribute "X3" numeric
+@attribute "X4" numeric
+@attribute "Y0" numeric
+@attribute "Y1" numeric
+@attribute "Y2" numeric
+@attribute "Y3" numeric
+@attribute "Y4" numeric
+@attribute "Z0" numeric
+@attribute "Z1" numeric
+@attribute "Z2" numeric
+@attribute "Z3" numeric
+@attribute "Z4" numeric
+@attribute "XAVG" numeric
+@attribute "YAVG" numeric
+@attribute "ZAVG" numeric
+@attribute "XSTANDDEV" numeric
+@attribute "YSTANDDEV" numeric
+@attribute "ZSTANDDEV" numeric
+@attribute "RESULTANT" numeric
+@attribute class{  "Driving", "Walking" , "Jogging" , "Upstairs" , "Downstairs" , "Sitting" , "Standing", "Still" }
+
+@data
